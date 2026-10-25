@@ -1,0 +1,1027 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>雾板写字</title>
+<!-- 雾板写字 demo：一块起雾的玻璃，歌词像被手指一笔一笔写在雾上，写过的地方透出后面的夜景，过一会儿重新起雾。
+     不依赖构建。可选的本地测试歌曲放 data/vocal-data.js 和 audio/（不进仓库），笔顺来自 strokes.js（AnimCJK，build-strokes.mjs 生成）。 -->
+<style>
+  html, body { margin: 0; height: 100%; background: #05070a; overflow: hidden; font: 13px/1.4 -apple-system, "PingFang SC", sans-serif; color: #dfe6ee; }
+  #gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+  #panel { position: fixed; top: 12px; left: 12px; width: 268px; padding: 12px; border-radius: 10px; background: rgba(12, 16, 22, 0.78); backdrop-filter: blur(8px); max-height: calc(100% - 48px); overflow: auto; }
+  #panel.hide { display: none; }
+  .row { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+  select, button, input[type=text] { font: inherit; color: inherit; background: #1b232d; border: 1px solid #2c3743; border-radius: 6px; padding: 4px 8px; }
+  input[type=text] { flex: 1; min-width: 0; }
+  button { cursor: pointer; }
+  .sec { margin: 10px 0 4px; color: #8fa1b3; font-size: 12px; }
+  .sl label { display: flex; justify-content: space-between; font-size: 12px; }
+  .sl input { width: 100%; }
+  #time { font-variant-numeric: tabular-nums; color: #8fa1b3; }
+  .hint { color: #6f8091; font-size: 11px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="panel">
+  <div class="row"><select id="song"></select><button id="play">播放</button><span id="time">0:00</span></div>
+  <div class="row"><input type="text" id="text" placeholder="输入一句，回车写到雾上"><button id="write">写</button></div>
+  <div id="sliders"></div>
+  <div class="hint">H 隐藏面板 · B 颠一下 · 在玻璃上按住拖动可以自己用手指画 · 「中文示例」不放音乐，按固定节奏写</div>
+</div>
+<audio id="au" preload="auto"></audio>
+<!-- 可选：本地测试歌曲，不进仓库，格式见 README -->
+<script src="data/vocal-data.js" onerror="this.remove()"></script>
+<!-- 笔顺数据不进仓库，用 tools/build-strokes.mjs 生成，见 README -->
+<script src="strokes.js" onerror="this.remove()"></script>
+<script src="sprite.js"></script>
+<script src="icons.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const cv = $('gl'), au = $('au');
+const qs = new URLSearchParams(location.search);
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const smooth = t => t * t * (3 - 2 * t);
+
+// ---------- 参数 ----------
+const P = { width: 0.09, speed: 1, hold: 1.2, refog: 4, mist: 0.75, size: 1, jitter: 0.6, edge: 0.6, beads: 0.35, drip: 0.25, refract: 1, fieldDrops: 0.5, glint: 1, bus: 1, doodle: 0.3, warp: 0.6, bump: 1, bumpRate: 1, bumpFall: 0.5, res: 1 };
+const SLIDERS = [
+  ['手指'],
+  ['width', '笔画粗细（× 字号）', 0.04, 0.16, 0.005],
+  ['speed', '书写速度', 0.4, 2.5, 0.05],
+  ['jitter', '手写歪斜（整字转动、上下错落、整行倾斜）', 0, 1.5, 0.05],
+  ['warp', '手写变形（字形斜切胖瘦、笔画长短偏移、手抖）', 0, 1.5, 0.05],
+  ['doodle', '句尾顺手画图标的概率', 0, 1, 0.05],
+  ['size', '字号', 0.5, 1.6, 0.05],
+  ['雾'],
+  ['mist', '雾气浓度', 0.2, 1, 0.01],
+  ['edge', '擦痕边缘毛糙', 0, 1, 0.01],
+  ['hold', '写完后保持（秒，下一句开始后）', 0, 6, 0.1],
+  ['refog', '重新起雾用时（秒）', 0.5, 12, 0.5],
+  ['水珠'],
+  ['beads', '擦痕边上凝出的小水珠', 0, 1, 0.01],
+  ['drip', '偶尔往下淌的水珠', 0, 1, 0.01],
+  ['fieldDrops', '雾上的凝结水珠', 0, 1.5, 0.05],
+  ['refract', '水珠折射', 0, 2, 0.05],
+  ['glint', '水珠高光', 0, 2, 0.05],
+  ['颠簸（B 键手动颠一下）'],
+  ['bump', '颠簸强度', 0, 2.5, 0.05],
+  ['bumpRate', '颠簸频率', 0, 3, 0.05],
+  ['bumpFall', '颠簸 → 大水珠被震落', 0, 1.5, 0.05],
+  ['画面'],
+  ['bus', '车速（窗外移动）', 0, 3, 0.05],
+  ['res', '渲染分辨率（× CSS 像素）', 0.5, 2, 0.25],
+];
+for (const k of Object.keys(P)) if (qs.has(k)) P[k] = parseFloat(qs.get(k));
+
+function buildSliders() {
+  const box = $('sliders');
+  for (const [key, label, min, max, step] of SLIDERS) {
+    if (label === undefined) { const d = document.createElement('div'); d.className = 'sec'; d.textContent = key; box.appendChild(d); continue; }
+    const d = document.createElement('div'); d.className = 'sl';
+    d.innerHTML = `<label><span>${label}</span><b id="v-${key}">${P[key]}</b></label><input type="range" min="${min}" max="${max}" step="${step}" value="${P[key]}">`;
+    box.appendChild(d);
+    const inp = d.querySelector('input');
+    inp.addEventListener('input', () => {
+      P[key] = parseFloat(inp.value); $('v-' + key).textContent = P[key];
+      if (key === 'res') resize();
+      if (key === 'fieldDrops') fieldDirty = true;
+      if (key === 'size' || key === 'jitter' || key === 'warp' || key === 'beads' || key === 'drip' || key === 'doodle') relayout();
+    });
+  }
+}
+
+// ---------- 歌曲 ----------
+const PALETTE = {
+  edelweiss: ['#0b1724', '#1d3a4c', '#8ecae6', '#ffd6a5', '#cfe8f3'],
+  uraomote: ['#12081c', '#2c0f3b', '#ff4fa3', '#39d5c9', '#ffd36e'],
+  paradichloro: ['#170f0a', '#2b1830', '#ffb347', '#9b7bff', '#ff6f61'],
+  sample: ['#0a1018', '#1c2a3a', '#ffcf8a', '#7fb8ff', '#ff8f70'],
+};
+// 默认示例先只画图标；原来的中文示例句留着备用
+const SAMPLE_LINES = ['❤⭐🌙', '☀🎵🌸', '✨☁🌧', '☂🐱😊', '❄🍃🪶'];
+const SAMPLE_LINES_ZH = ['雾气慢慢爬满了窗', '我用指尖写下你的名字 ❤', '一笔一画都很认真', '后来它又被雾吞没 ☁', '就像你从来没有来过', '窗外的灯一盏一盏亮起 ✨', '我再写一遍 🌙'];
+// emoji → 商籁同款的 lucide 图标（线稿，可以直接当笔画画）
+const EMOJI_ICON = {
+  '❤': 'heart', '♥': 'heart', '💗': 'heart', '⭐': 'star', '★': 'star', '☆': 'star', '🌙': 'moon', '☀': 'sun', '🌞': 'sun',
+  '🎵': 'music', '♪': 'music-2', '🎶': 'music', '🌸': 'flower', '✿': 'flower-2', '🌷': 'flower-2', '✨': 'sparkles',
+  '☁': 'cloud', '🌧': 'cloud-rain', '☂': 'umbrella', '☔': 'umbrella', '🐱': 'cat', '😊': 'smile', '🙂': 'smile',
+  '❄': 'snowflake', '🍃': 'leaf', '🌿': 'leaf', '🪶': 'feather',
+};
+// 拆成逐字，去掉 emoji 变体选择符，认得的 emoji 换成图标记号 icon:名字
+const splitText = text => [...text.replace(/[\uFE0F\u200D]/g, '')].map(ch => EMOJI_ICON[ch] ? 'icon:' + EMOJI_ICON[ch] : ch);
+
+// 把歌词整理成逐字数组：[{ ch, t, d }]，逐词按字母均分，逐行按字均分
+function toChars(l) {
+  const out = [];
+  const words = l.words || [[l.t, l.d, l.text]];
+  for (const [t, d, text] of words) {
+    const cs = splitText(text);
+    cs.forEach((ch, i) => out.push({ ch, t: t + d * i / cs.length, d: d / cs.length }));
+  }
+  return out;
+}
+const SONGS = (window.VOCAL_DATA || []).map(v => ({ id: v.id, name: v.name, audio: v.audio, lines: v.lines.map(l => ({ t: l.t, d: l.d, chars: toChars(l) })) }));
+// 内置两组示例，不放音乐，按固定节奏循环
+const sampleSong = (id, name, lines) => ({
+  id, name, audio: null,
+  lines: lines.map((text, i) => {
+    const t = 1 + i * 6, per = 0.62;
+    const cs = splitText(text);
+    return { t, d: cs.length * per, chars: cs.map((ch, j) => ({ ch, t: t + j * per, d: ch.startsWith('icon:') ? per * 2 : per })) };
+  }),
+});
+SONGS.push(sampleSong('sample', '图标示例（无音乐）', SAMPLE_LINES), sampleSong('sample-zh', '中文示例（无音乐）', SAMPLE_LINES_ZH));
+
+// ---------- 字形：笔画中线 ----------
+// 返回 { strokes: [{ pts: [[x,y]...] (em 单位, 0..1), cum: [...], len }], total }
+const glyphCache = new Map();
+function getGlyph(ch) {
+  if (glyphCache.has(ch)) return glyphCache.get(ch);
+  let polys = null;
+  const med = window.STROKES && window.STROKES[ch];
+  if (ch.startsWith('icon:')) polys = iconPolys(ch.slice(5));
+  else if (med) polys = med.map(m => catmull(m.map(([x, y]) => [x / 1024, y / 1024]), 6));
+  else if (ch.trim()) polys = skeletonGlyph(ch);
+  const g = polys ? measure(polys) : null;
+  glyphCache.set(ch, g);
+  return g;
+}
+function measure(polys) {
+  let total = 0;
+  const strokes = polys.filter(p => p.length > 1).map(pts => {
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    total += cum[cum.length - 1];
+    return { pts, cum, len: cum[cum.length - 1] };
+  }).filter(s => s.len > 0.005);
+  return strokes.length ? { strokes, total } : null;
+}
+// Catmull-Rom 细分，让稀疏的中线点变成顺滑曲线
+function catmull(pts, n) {
+  if (pts.length < 3) return pts;
+  const out = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    for (let k = 0; k < n; k++) {
+      const t = k / n, t2 = t * t, t3 = t2 * t;
+      out.push([0, 1].map(j => 0.5 * (2 * p1[j] + (-p0[j] + p2[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2 + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * t3)));
+    }
+  }
+  out.push(pts[pts.length - 1]);
+  return out;
+}
+
+// lucide 图标：每个 SVG 元素按出现顺序是一笔，用浏览器沿路径取点；路径里的子路径（跳笔）拆开
+let iconSvg = null;
+function iconPolys(name) {
+  const nodes = window.ICONS && window.ICONS[name];
+  if (!nodes) return null;
+  if (!iconSvg) {
+    iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    iconSvg.setAttribute('viewBox', '0 0 24 24');
+    iconSvg.style.cssText = 'position:absolute;width:24px;height:24px;left:-99px;top:-99px;visibility:hidden';
+    document.body.appendChild(iconSvg);
+  }
+  const polys = [];
+  for (const [tag, attrs] of nodes) {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+    iconSvg.appendChild(el);
+    const len = el.getTotalLength(), step = 0.35;
+    let cur = [], prev = null;
+    for (let l = 0; l <= len + 1e-6; l += step) {
+      const p = el.getPointAtLength(Math.min(l, len)), q = [p.x / 24, p.y / 24];
+      if (prev && Math.hypot(q[0] - prev[0], q[1] - prev[1]) > step * 3 / 24) { if (cur.length > 1) polys.push(cur); cur = []; }
+      cur.push(q); prev = q;
+    }
+    if (cur.length > 1) polys.push(cur);
+    el.remove();
+  }
+  return polys;
+}
+
+// 没有笔顺数据的字（拉丁字母、标点）：用字体画出来，细化成单像素骨架，再追踪成折线
+const SK = 96;
+const skCanvas = document.createElement('canvas'); skCanvas.width = skCanvas.height = SK;
+const skCtx = skCanvas.getContext('2d', { willReadFrequently: true });
+function skeletonGlyph(ch) {
+  skCtx.fillStyle = '#000'; skCtx.fillRect(0, 0, SK, SK);
+  skCtx.fillStyle = '#fff'; skCtx.textAlign = 'center'; skCtx.textBaseline = 'alphabetic';
+  skCtx.font = `600 ${SK * 0.78}px "Helvetica Neue", "PingFang SC", sans-serif`;
+  skCtx.fillText(ch, SK / 2, SK * 0.8);
+  const data = skCtx.getImageData(0, 0, SK, SK).data;
+  const img = new Uint8Array(SK * SK);
+  for (let i = 0; i < SK * SK; i++) img[i] = data[i * 4] > 110 ? 1 : 0;
+  zhangSuen(img);
+  const polys = traceSkeleton(img).map(p => chaikin(rdp(p, 1.2), 2).map(([x, y]) => [x / SK, y / SK]));
+  // 从上到下、从左到右的大致笔顺；每条线从更靠左上的一端开始
+  for (const p of polys) if (p[0][1] + p[0][0] * 0.6 > p[p.length - 1][1] + p[p.length - 1][0] * 0.6) p.reverse();
+  polys.sort((a, b) => (Math.min(...a.map(q => q[1])) - Math.min(...b.map(q => q[1]))) * 0.6 + (Math.min(...a.map(q => q[0])) - Math.min(...b.map(q => q[0]))));
+  return polys.length ? polys : null;
+}
+function zhangSuen(img) {
+  const at = (x, y) => (x < 0 || y < 0 || x >= SK || y >= SK) ? 0 : img[y * SK + x];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let pass = 0; pass < 2; pass++) {
+      const del = [];
+      for (let y = 0; y < SK; y++) for (let x = 0; x < SK; x++) {
+        if (!img[y * SK + x]) continue;
+        const n = [at(x, y - 1), at(x + 1, y - 1), at(x + 1, y), at(x + 1, y + 1), at(x, y + 1), at(x - 1, y + 1), at(x - 1, y), at(x - 1, y - 1)];
+        const b = n.reduce((s, v) => s + v, 0);
+        if (b < 2 || b > 6) continue;
+        let a = 0; for (let i = 0; i < 8; i++) if (!n[i] && n[(i + 1) % 8]) a++;
+        if (a !== 1) continue;
+        if (pass === 0 ? (n[0] * n[2] * n[4] || n[2] * n[4] * n[6]) : (n[0] * n[2] * n[6] || n[0] * n[4] * n[6])) continue;
+        del.push(y * SK + x);
+      }
+      for (const i of del) img[i] = 0;
+      if (del.length) changed = true;
+    }
+  }
+}
+function traceSkeleton(img) {
+  const N = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, 1], [-1, -1], [1, -1]];
+  const on = (x, y) => x >= 0 && y >= 0 && x < SK && y < SK && img[y * SK + x];
+  const deg = (x, y) => N.reduce((s, [dx, dy]) => s + (on(x + dx, y + dy) ? 1 : 0), 0);
+  const seen = new Uint8Array(SK * SK), polys = [];
+  const walk = (x, y) => {
+    const p = [[x, y]]; seen[y * SK + x] = 1;
+    let dir = null;
+    for (;;) {
+      let best = null, bestScore = -9;
+      for (const [dx, dy] of N) {
+        const nx = x + dx, ny = y + dy;
+        if (!on(nx, ny) || seen[ny * SK + nx]) continue;
+        const score = dir ? (dx * dir[0] + dy * dir[1]) / Math.hypot(dx, dy) : 0;
+        if (score > bestScore) { bestScore = score; best = [nx, ny, dx, dy]; }
+      }
+      if (!best) break;
+      [x, y] = best; dir = [best[2], best[3]];
+      seen[y * SK + x] = 1; p.push([x, y]);
+    }
+    if (p.length >= 4) polys.push(p);
+  };
+  const starts = [];
+  for (let y = 0; y < SK; y++) for (let x = 0; x < SK; x++) if (img[y * SK + x] && deg(x, y) === 1) starts.push([x, y]);
+  for (const [x, y] of starts) if (!seen[y * SK + x]) walk(x, y);
+  for (let y = 0; y < SK; y++) for (let x = 0; x < SK; x++) if (img[y * SK + x] && !seen[y * SK + x]) walk(x, y);
+  return polys;
+}
+function rdp(pts, eps) {
+  if (pts.length < 3) return pts;
+  const [a, b] = [pts[0], pts[pts.length - 1]];
+  const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+  let idx = 0, dmax = 0;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const d = Math.abs((b[0] - a[0]) * (a[1] - pts[i][1]) - (a[0] - pts[i][0]) * (b[1] - a[1])) / L;
+    if (d > dmax) { dmax = d; idx = i; }
+  }
+  return dmax > eps ? [...rdp(pts.slice(0, idx + 1), eps).slice(0, -1), ...rdp(pts.slice(idx), eps)] : [a, b];
+}
+function chaikin(pts, it) {
+  for (let k = 0; k < it && pts.length > 2; k++) {
+    const o = [pts[0]];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [p, q] = [pts[i], pts[i + 1]];
+      o.push([p[0] * 0.75 + q[0] * 0.25, p[1] * 0.75 + q[1] * 0.25], [p[0] * 0.25 + q[0] * 0.75, p[1] * 0.25 + q[1] * 0.75]);
+    }
+    o.push(pts[pts.length - 1]); pts = o;
+  }
+  return pts;
+}
+
+// ---------- 排版 ----------
+function mulberry(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const isWide = ch => /[　-鿿＀-￯]/.test(ch);
+function advance(ch) {
+  if (ch.startsWith('icon:')) return 1.1;
+  if (ch === ' ') return 0.32;
+  if (/[，。、・．]/.test(ch)) return 0.5;
+  if (isWide(ch)) return 1;
+  if (/[il.,'!|:;]/.test(ch)) return 0.3;
+  if (/[mwMW]/.test(ch)) return 0.72;
+  return 0.5;
+}
+// 给一句歌词排位置：两行交替上下半屏，随机横向位置，逐字轻微歪斜
+function layoutLine(line, idx, W, H) {
+  const rnd = mulberry(idx * 7919 + 13);
+  const chars = line.chars;
+  const adv = chars.map(c => advance(c.ch));
+  const total = adv.reduce((s, v) => s + v, 0);
+  let rows = [[0, chars.length]];
+  let S = Math.min(W * 0.8 / total, H * 0.22);
+  if (S < H * 0.11 && chars.length > 4) {
+    // 拆成两行，优先在空格处断开
+    let best = 1, bestD = 1e9, acc = 0;
+    for (let i = 0; i < chars.length; i++) {
+      acc += adv[i];
+      const d = Math.abs(acc - total / 2) - (chars[i].ch === ' ' ? total * 0.12 : 0);
+      if (d < bestD) { bestD = d; best = i + 1; }
+    }
+    rows = [[0, best], [best, chars.length]];
+    const widths = rows.map(([a, b]) => adv.slice(a, b).reduce((s, v) => s + v, 0));
+    S = Math.min(W * 0.8 / Math.max(...widths), H * 0.12);
+  }
+  S = Math.max(28, S * P.size);
+  const blockH = rows.length * S * 1.2;
+  const cy = (idx % 2 === 0 ? 0.3 : 0.7) * H + (rnd() - 0.5) * H * 0.05;
+  const rowTilt = (rnd() - 0.5) * 0.07 * P.jitter;
+  const out = [];
+  rows.forEach(([a, b], r) => {
+    const w = adv.slice(a, b).reduce((s, v) => s + v, 0) * S;
+    const slack = Math.max(0, W * 0.86 - w);
+    let x = (W - w) / 2 + (rnd() - 0.5) * slack * 0.6;
+    const y0 = cy - blockH / 2 + (r + 0.5) * S * 1.2;
+    for (let i = a; i < b; i++) {
+      const cw = adv[i] * S, cx = x + cw / 2;
+      const j = P.jitter;
+      out.push({
+        ...chars[i], glyph: getGlyph(chars[i].ch),
+        x: cx + (rnd() - 0.5) * S * 0.06 * j,
+        y: y0 + (cx - W / 2) * rowTilt + (rnd() - 0.5) * S * 0.08 * j,
+        s: S * (1 + (rnd() - 0.5) * 0.14 * j) * (isWide(chars[i].ch) || chars[i].ch.startsWith('icon:') ? 1 : 1.15),
+        rot: (rnd() - 0.5) * 0.12 * j + rowTilt,
+      });
+      decorate(out[out.length - 1], mulberry(idx * 131 + i * 17 + 5));
+      x += cw;
+    }
+  });
+  return out;
+}
+
+// 给一个字挑水珠：每一笔沿边缘零星凝出小水珠，少数笔画底部会淌下一颗
+function decorate(c, rnd) {
+  if (!c.glyph) return;
+  c.wg = warpGlyph(c.glyph, mulberry(Math.floor(rnd() * 1e9)), P.warp);
+  const g = c.wg;
+  c.beads = g.strokes.map(st => {
+    const out = [], step = 7 / c.s;
+    for (let s = step * rnd(); s < st.len; s += step * (0.5 + rnd())) {
+      if (rnd() > P.beads) continue;
+      const [x, y, nx, ny] = pointAt(st, s), side = rnd() < 0.5 ? -1 : 1;
+      out.push({ s, x, y, nx: nx * side, ny: ny * side, r: 1.6 + rnd() ** 2.2 * 3.6, j: rnd() });
+    }
+    return out;
+  });
+  c.drips = g.strokes.map(() => rnd() < P.drip * 0.22
+    ? { delay: 0.3 + rnd() * 1.6, len: 30 + rnd() * 130, dur: 2 + rnd() * 3.5, r: 3.2 + rnd() * 2.6, seed: rnd() * 100 } : null);
+}
+// 手写变形：不只是整字旋转，而是每个字自己有点斜、有点扁或瘦、整体带一点弯，
+// 每一笔再各自偏一点、转一点、长短不一，沿笔画还有一点手抖。j 是「手写变形」滑块
+function warpGlyph(g, rnd, j) {
+  if (j <= 0) return g;
+  const r = () => rnd() * 2 - 1;
+  const shear = r() * 0.16 * j, sx = 1 + r() * 0.1 * j, sy = 1 + r() * 0.1 * j;
+  const bx = r() * 0.035 * j, by = r() * 0.035 * j, px = rnd() * 6.28, py = rnd() * 6.28;
+  // 整字：以中心为原点斜切、缩放，再叠一层低频弯曲
+  const whole = ([x, y]) => {
+    let u = (x - 0.5) * sx, v = (y - 0.5) * sy;
+    u += v * shear;
+    u += bx * Math.sin(v * Math.PI * 1.6 + px);
+    v += by * Math.sin(u * Math.PI * 1.6 + py);
+    return [u + 0.5, v + 0.5];
+  };
+  // 笔画多的字，每一笔的偏移收小，保证部件位置还对
+  const sj = clamp(8 / g.strokes.length, 0.35, 1);
+  const polys = g.strokes.map(st => {
+    const pts = st.pts, n = pts.length;
+    const cx = pts.reduce((a, p) => a + p[0], 0) / n, cy = pts.reduce((a, p) => a + p[1], 0) / n;
+    const rot = r() * 0.09 * j * sj, len = 1 + r() * 0.1 * j * sj, ox = r() * 0.022 * j * sj, oy = r() * 0.022 * j * sj;
+    const cr = Math.cos(rot), sr = Math.sin(rot), [x0, y0] = pts[0];
+    const tremor = 0.006 * j, tf = 18 + rnd() * 14, tp = rnd() * 6.28;
+    return pts.map(([x, y], i) => {
+      // 这一笔：以起笔点为原点伸缩（写长写短），绕中心转一点，再整体挪一点
+      let u = x0 + (x - x0) * len, v = y0 + (y - y0) * len;
+      const du = u - cx, dv = v - cy;
+      u = cx + du * cr - dv * sr + ox; v = cy + du * sr + dv * cr + oy;
+      // 手抖：垂直于笔画方向的细小起伏
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+      const tx = b[0] - a[0], ty = b[1] - a[1], tl = Math.hypot(tx, ty) || 1;
+      const k = Math.sin(st.cum[i] * tf + tp) * tremor;
+      return whole([u - ty / tl * k, v + tx / tl * k]);
+    });
+  });
+  return measure(polys) || g;
+}
+// 折线上弧长 s 处的点和法线
+function pointAt(st, s) {
+  const { pts, cum } = st;
+  let i = 1;
+  while (i < pts.length - 1 && cum[i] < s) i++;
+  const a = pts[i - 1], b = pts[i], L = Math.max(1e-6, cum[i] - cum[i - 1]), k = clamp((s - cum[i - 1]) / L);
+  const dx = (b[0] - a[0]) / L, dy = (b[1] - a[1]) / L;
+  return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, -dy, dx];
+}
+// 字内 em 坐标 → 屏幕 CSS 像素
+function toScreen(c, u, v) {
+  const cs = Math.cos(c.rot), sn = Math.sin(c.rot), lx = (u - 0.5) * c.s, ly = (v - 0.5) * c.s;
+  return [c.x + cs * lx - sn * ly, c.y + sn * lx + cs * ly];
+}
+
+// ---------- 状态 ----------
+let song = null, laid = [], simStart = 0, simT0 = qs.has('t') ? parseFloat(qs.get('t')) : null;
+let W = 0, H = 0, DPR = 1;
+const freeLines = [];   // 输入框写的句子（按真实时间）
+const fingerPaths = []; // 鼠标/触摸自己画的线
+
+// 有的句子写完顺手画个图标（同商籁的图标），按种子决定，概率由滑块控制
+const DOODLES = ['heart', 'star', 'moon', 'music', 'flower', 'sparkles', 'cloud-rain', 'umbrella', 'smile', 'leaf'];
+function withDoodle(l, i) {
+  if (l.chars.some(c => c.ch.startsWith('icon:'))) return l;
+  const rnd = mulberry(i * 977 + 31);
+  if (rnd() >= P.doodle) return l;
+  const last = l.chars[l.chars.length - 1];
+  return { ...l, chars: [...l.chars, { ch: ' ', t: last.t + last.d, d: 0 }, { ch: 'icon:' + DOODLES[Math.floor(rnd() * DOODLES.length)], t: last.t + last.d + 0.08, d: 1.1 }] };
+}
+function relayout() {
+  if (!song) return;
+  laid = song.lines.map((l, i) => ({ chars: layoutLine(withDoodle(l, i), i, W, H), t: l.t, end: l.t + l.d, next: song.lines[i + 1] ? song.lines[i + 1].t : Infinity }));
+  for (const f of freeLines) f.chars = layoutLine(f.src, f.seed, W, H);
+}
+function songTime() {
+  if (song && !song.audio) return ((simT0 || 0) + (performance.now() - simStart) / 1000) % (song.lines.length * 6 + 4);
+  if (simT0 !== null) return simT0 + (performance.now() - simStart) / 1000;
+  return au.currentTime;
+}
+function loadSong(id) {
+  song = SONGS.find(s => s.id === id) || SONGS[0];
+  au.pause();
+  if (song.audio) au.src = song.audio; else au.removeAttribute('src');
+  simStart = performance.now();
+  setPalette(); relayout();
+  $('play').textContent = '播放';
+}
+
+// 每首歌一套窗外配色
+function setPalette() {
+  const pal = PALETTE[song.id] || PALETTE.sample;
+  const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+  ['uSky0', 'uSky1', 'uLa', 'uLb', 'uLc'].forEach((n, i) => gl.uniform3fv(gl.getUniformLocation(prog, n), rgb(pal[i])));
+}
+
+// ---------- 水珠：照 raindrop-fx 的做法 ----------
+// 每颗水珠是一张法线贴图精灵（RG 法线、A 软边覆盖），叠加到一张水珠纹理上；
+// 合成时对覆盖取 0.96–0.99 的阈值，挨得近的水珠会粘成一团，形状不是正圆。
+// 每颗实例：中心 x、y，宽、高（CSS 像素），size（宽/100，决定折射强度），alpha
+const dynInst = [];
+let fieldInst = [], fieldDirty = true;
+// r 是水珠看得见的半径；精灵只有中间约 1/4 宽度能过阈值，所以四边形是 8r
+function putDrop(x, y, r, alpha, sx = 1, sy = 1) {
+  if (r < 0.5 || alpha <= 0.01) return;
+  const wb = wobbleAt(performance.now() / 1000, x * 0.05 + y * 0.03);
+  const w = r * 8 * sx * (1 + wb), h = r * 8 * sy * (1 - wb);
+  dynInst.push(x, y, w, h, w / 100, Math.min(1, alpha));
+}
+// 雾上的凝结水珠：下半部分略多略大；被手指擦掉的地方在合成时去掉。颠簸时会晃，大的会被震落
+let fieldDrops = [];
+function buildField() {
+  const rnd = mulberry(4242), n = Math.round(W * H / 2200 * P.fieldDrops);
+  fieldDrops = [];
+  for (let i = 0; i < n; i++) {
+    const big = rnd() < 0.12;
+    const w = big ? 40 + rnd() * 34 : 14 + rnd() ** 1.4 * 22;
+    const sp = rnd() * 0.25;
+    fieldDrops.push({ x: rnd() * W, y: H * (1 - rnd() ** 1.25), w: w * (1 + sp * 0.5), h: w * (1 + sp), phase: rnd() * 6.28, fall: null });
+  }
+  trails.length = 0;
+}
+
+// ---------- 颠簸：公交车压过坑，车身一震，水珠跟着晃，大水珠被震落 ----------
+const bumps = [], trails = [];
+let nextBump = 0;
+const bumpRnd = mulberry(777);
+function triggerBump(now, a) {
+  bumps.push({ t: now, a });
+  while (bumps.length && now - bumps[0].t > 3) bumps.shift();
+  // 越大的水珠越容易被震落
+  for (const d of fieldDrops) {
+    if (d.fall || d.w < 26) continue;
+    if (bumpRnd() < P.bumpFall * a * (d.w - 24) / 45) {
+      const dur = 1 + bumpRnd() * 2.2;
+      d.fall = { t0: now + bumpRnd() * 0.12, y0: d.y, len: (30 + bumpRnd() * 150) * d.w / 50, dur, trail: { x: d.x, y0: d.y - d.h * 0.05, y1: d.y, w: d.w, end: null, seed: bumpRnd() * 100 } };
+      trails.push(d.fall.trail);
+    }
+  }
+}
+// 车身位移（CSS 像素）：先往下一沉，再阻尼回弹，横向带一点
+function shakeAt(now) {
+  let x = 0, y = 0;
+  for (const b of bumps) {
+    const dt = now - b.t;
+    if (dt < 0) continue;
+    const k = b.a * P.bump;
+    y += k * 7 * Math.exp(-dt * 4.5) * Math.sin(dt * Math.PI * 2 * 3.8);
+    x += k * 2 * Math.exp(-dt * 5.5) * Math.sin(dt * Math.PI * 2 * 2.7 + 1.2);
+  }
+  return [x, y];
+}
+// 水珠形变：颠簸后来回压扁、拉长几下
+function wobbleAt(now, phase) {
+  let w = 0;
+  for (const b of bumps) {
+    const dt = now - b.t;
+    if (dt >= 0) w += b.a * P.bump * 0.16 * Math.exp(-dt * 3.2) * Math.sin(dt * Math.PI * 2 * 7 + phase);
+  }
+  return w;
+}
+// 每帧算雾上水珠的实例：晃动，掉落中的往下走走停停并拉长
+function fieldInstances(now) {
+  const out = [];
+  for (const d of fieldDrops) {
+    let x = d.x, y = d.y, stretch = 0;
+    if (d.fall) {
+      const f = d.fall, tr = f.trail, u = clamp((now - f.t0) / f.dur);
+      y = f.y0 + f.len * (u - Math.sin(u * 6 * Math.PI) / (6 * Math.PI));
+      // 横向跟水痕同一条弯曲
+      x = tr.x + Math.sin(y * 0.07 + tr.seed) * 1.4 + Math.sin(y * 0.021 + tr.seed * 2) * 2.2;
+      stretch = 0.4 * (1 - Math.cos(u * 6 * Math.PI)) * (u < 1 ? 1 : 0);
+      tr.y1 = y;
+      if (u >= 1) { d.x = x; d.y = y; tr.end = now; d.fall = null; }
+    }
+    const wb = wobbleAt(now, d.phase);
+    out.push(x, y, d.w * (1 + wb), d.h * (1 - wb + stretch), d.w / 100, 1);
+  }
+  return out;
+}
+
+// ---------- 擦痕遮罩（2D 画布，半分辨率） ----------
+const mask = document.createElement('canvas');
+const mctx = mask.getContext('2d');
+const MASK_SCALE = 0.5;
+// 在遮罩上画一条手指擦痕：三层由宽到窄、由暗到亮，叠成边缘渐变，着色器再按噪声取阈值
+function strokePath(path, width, v) {
+  const passes = [[1.3, 0.38], [1.0, 0.72], [0.62, 1]];
+  for (const [wk, vk] of passes) {
+    const c = Math.round(255 * v * vk);
+    mctx.strokeStyle = `rgb(${c},${c},${c})`;
+    mctx.lineWidth = width * wk;
+    mctx.stroke(path);
+  }
+}
+// 水珠流下来的水痕：宽度接近水珠本身，边缘按噪声起伏，越往上（越早）越细一点
+// wob(y) 是水痕在 y 处的横向偏移，和水珠头用同一个，水珠才会走在自己的水痕上
+function strokeTrail(x, y0, y1, width, v, seed, wob) {
+  if (y1 - y0 < 2) return;
+  const seg = 4;
+  for (let y = y0; y < y1; y += seg) {
+    const ye = Math.min(y1, y + seg + 1);
+    const along = (y - y0) / Math.max(1, y1 - y0);
+    const w = width * (0.72 + 0.28 * along) * (0.85 + 0.3 * (0.5 + 0.5 * Math.sin(y * 0.19 + seed * 3)));
+    const p = new Path2D(); p.moveTo(x + wob(y), y); p.lineTo(x + wob(ye), ye);
+    strokePath(p, w, v);
+  }
+}
+// 某一笔在 [0,len] 上画到 l 的部分
+function partialPath(st, l) {
+  const p = new Path2D(), pts = st.pts, cum = st.cum;
+  p.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) {
+    if (cum[i] >= l) {
+      const k = (l - cum[i - 1]) / Math.max(1e-6, cum[i] - cum[i - 1]);
+      p.lineTo(pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * k, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * k);
+      return p;
+    }
+    p.lineTo(pts[i][0], pts[i][1]);
+  }
+  return p;
+}
+// 一个字的书写进度：按演唱时长写完，太慢的字按自然速度提前写完
+function drawChar(c, T, clarity) {
+  const g = c.wg || c.glyph;
+  if (!g || T < c.t) return;
+  const natural = (g.total * 0.28 + (g.strokes.length - 1) * 0.06) / P.speed;
+  const wd = clamp(c.d * 0.95, natural * 0.3, natural);
+  const gap = Math.min(0.06 / P.speed, wd * 0.08);
+  const inkTime = wd - gap * (g.strokes.length - 1);
+  let local = T - c.t;
+  const k = MASK_SCALE, cs = Math.cos(c.rot), sn = Math.sin(c.rot);
+  mctx.setTransform(cs * c.s * k, sn * c.s * k, -sn * c.s * k, cs * c.s * k, (c.x - c.s / 2 * (cs - sn)) * k, (c.y - c.s / 2 * (sn + cs)) * k);
+  // 笔画多的字笔画收细一点，不然挤在一起糊成一团
+  const width = Math.max(P.width * clamp(Math.sqrt(9 / g.strokes.length), 0.55, 1), 8 / c.s);
+  const drips = [];
+  g.strokes.forEach((st, si) => {
+    const dur = inkTime * st.len / g.total;
+    if (local <= 0) return;
+    const p = clamp(local / dur);
+    const eased = p * 0.4 + smooth(p) * 0.6, drawn = eased * st.len;
+    strokePath(partialPath(st, drawn), width, clarity);
+    // 擦痕边上的小水珠：手指推过去的水在边缘凝成珠，起雾时跟着变小
+    if (c.beads) for (const b of c.beads[si]) {
+      if (b.s > drawn) break;
+      const off = width / 2 + (b.r * 0.7 + b.j * 1.5) / c.s;
+      const [x, y] = toScreen(c, b.x + b.nx * off, b.y + b.ny * off);
+      putDrop(x, y, b.r * (0.55 + 0.45 * clarity), clarity, 1 + b.j * 0.25, 1 + (1 - b.j) * 0.3);
+    }
+    const d = c.drips && c.drips[si];
+    if (d && p >= 1 && local - dur > d.delay) drips.push([st, d, local - dur - d.delay]);
+    local -= dur + gap;
+  });
+  mctx.setTransform(MASK_SCALE, 0, 0, MASK_SCALE, 0, 0);
+  for (const [st, d, age] of drips) drawDrip(c, st, d, age, width, clarity);
+  mctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+// 一颗往下淌的水珠：从笔画最低处出发，走走停停，越走越小，留下一道擦开的水痕
+function drawDrip(c, st, d, age, width, clarity) {
+  let bx = 0, by = -1e9;
+  for (const q of st.pts) { const [x, y] = toScreen(c, q[0], q[1]); if (y > by) { bx = x; by = y; } }
+  by += width * c.s * 0.35;
+  const u = clamp(age / d.dur), f = u - Math.sin(u * 6 * Math.PI) / (6 * Math.PI);
+  const dist = d.len * f, r = d.r * (1 - 0.35 * u);
+  const wob = y => Math.sin(y * 0.07 + d.seed) * 1.6 + Math.sin(y * 0.023 + d.seed * 2) * 2.5;
+  if (dist > 1) strokeTrail(bx, by, by + dist, r * 1.5, clarity * 0.95, d.seed, y => wob(y - by));
+  // 走的时候被拉长，停下来变回圆一点；身后零星留下小水珠（raindrop-fx 的 trail drops）
+  const speed = 1 - Math.cos(u * 6 * Math.PI);
+  for (let y = 14 + (d.seed % 7) * 2; y < dist - r * 2; y += 18 + ((y * 7 + d.seed * 13) % 11)) putDrop(bx + wob(y), by + y, r * (0.3 + 0.2 * (((y + d.seed) * 0.37) % 1)), clarity);
+  putDrop(bx + wob(dist), by + dist + r * 0.3, r, clarity, 1, 1 + 0.35 * speed * (u < 1 ? 1 : 0));
+}
+// 一句歌词的清晰度：写的时候是 1，下一句开始后保持 hold 秒，再用 refog 秒慢慢起雾
+function lineClarity(start, end, next, T) {
+  const fogAt = Math.min(next, end + 6) + P.hold;
+  return 1 - smooth(clamp((T - fogAt) / P.refog));
+}
+function drawMask(T, now) {
+  dynInst.length = 0;
+  mctx.setTransform(1, 0, 0, 1, 0, 0);
+  mctx.globalCompositeOperation = 'source-over';
+  mctx.fillStyle = '#000'; mctx.fillRect(0, 0, mask.width, mask.height);
+  mctx.globalCompositeOperation = 'lighten';
+  mctx.lineCap = 'round'; mctx.lineJoin = 'round';
+  for (const L of laid) {
+    if (T < L.t - 0.5) continue;
+    const v = lineClarity(L.t, L.end, L.next, T);
+    if (v <= 0.002) continue;
+    for (const c of L.chars) drawChar(c, T, v);
+  }
+  for (const f of freeLines) {
+    const v = lineClarity(f.t, f.end, Infinity, now);
+    if (v > 0.002) for (const c of f.chars) drawChar(c, now, v);
+  }
+  // 被震落的水珠留下的水痕，和手指擦痕一样过一会儿重新起雾
+  for (const tr of trails) {
+    const v = tr.end === null ? 1 : 1 - smooth(clamp((now - tr.end - P.hold) / P.refog));
+    if (v <= 0.002 || tr.y1 - tr.y0 < 2) continue;
+    mctx.setTransform(MASK_SCALE, 0, 0, MASK_SCALE, 0, 0);
+    const wob = y => Math.sin(y * 0.07 + tr.seed) * 1.4 + Math.sin(y * 0.021 + tr.seed * 2) * 2.2;
+    strokeTrail(tr.x, tr.y0, tr.y1, tr.w * 0.18, v * 0.95, tr.seed, wob);
+    // 水痕里零星留下的小水珠（同 raindrop-fx 的 trail drops）
+    for (let y = tr.y0 + 10 + (tr.seed % 9); y < tr.y1 - tr.w * 0.25; y += 16 + ((y * 7 + tr.seed * 13) % 13)) putDrop(tr.x + wob(y), y, tr.w * (0.03 + 0.03 * (((y + tr.seed) * 0.37) % 1)), v);
+  }
+  for (const fp of fingerPaths) {
+    const v = fp.end === null ? 1 : 1 - smooth(clamp((now - fp.end - P.hold) / P.refog));
+    if (v <= 0.002 || fp.pts.length < 1) continue;
+    mctx.setTransform(MASK_SCALE, 0, 0, MASK_SCALE, 0, 0);
+    const p = new Path2D(); p.moveTo(fp.pts[0][0], fp.pts[0][1]);
+    for (const q of fp.pts) p.lineTo(q[0], q[1]);
+    if (fp.pts.length === 1) p.lineTo(fp.pts[0][0] + 0.1, fp.pts[0][1]);
+    strokePath(p, Math.max(14, Math.min(W, H) * 0.022), v);
+  }
+  mctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+// ---------- WebGL ----------
+const gl = cv.getContext('webgl2', { antialias: false, alpha: false });
+const VS = `#version 300 es
+in vec2 aPos; out vec2 vUv;
+void main() { vUv = aPos * 0.5 + 0.5; vUv.y = 1.0 - vUv.y; gl_Position = vec4(aPos, 0.0, 1.0); }`;
+const FS = `#version 300 es
+precision highp float;
+uniform sampler2D uMask, uDrop, uField;
+uniform vec2 uRes, uGlassShift, uSceneShift; uniform float uTime, uMist, uEdge, uRefract, uBus, uGlint;
+uniform vec3 uSky0, uSky1, uLa, uLb, uLc;
+in vec2 vUv; out vec4 outColor;
+float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float h1(float n) { return fract(sin(n * 127.1 + 3.7) * 43758.5453); }
+float vnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+}
+vec3 pick(float h) { return h < 0.34 ? uLa : (h < 0.67 ? uLb : uLc); }
+// 高斯光点：r 光点半径，b 模糊半径，streak 横向拖影半长；模糊越大越暗、越散
+float glowPt(vec2 d, float r, float b, float streak) {
+  d.x = sign(d.x) * max(abs(d.x) - streak, 0.0);
+  float s2 = r * r + b * b;
+  return (r * r / s2) * exp(-dot(d, d) / s2 * 1.6);
+}
+// 软边矩形：size 半宽高，soft 模糊半径
+float softBox(vec2 d, vec2 size, float soft) {
+  vec2 q = abs(d) - size;
+  float sd = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+  float k = min(size.x, size.y);
+  return (1.0 - smoothstep(-soft * 0.5, soft, sd)) * k / (k + soft * 0.6);
+}
+const float HZ = 0.6, ROAD = 0.7;
+const vec3 SODIUM = vec3(1.0, 0.68, 0.32);
+// 路灯和招牌（倒影也用它）
+vec3 lampsSigns(vec2 q, float b, float t) {
+  vec3 c = vec3(0.0);
+  // 招牌、店面：近，移动快，带横向拖影
+  float xs = q.x + t * 0.42, cw = 0.34, streak = 0.012 * uBus;
+  float cs = floor(xs / cw);
+  for (float k = -1.0; k <= 1.0; k++) {
+    float n = cs + k, hx = h1(n), hy = h1(n + 17.0);
+    vec2 cen = vec2((n + 0.2 + 0.6 * hx) * cw, 0.46 + 0.1 * hy);
+    vec2 sz = vec2(0.02 + 0.05 * h1(n + 5.0), 0.012 + 0.016 * h1(n + 9.0));
+    if (h1(n + 33.0) < 0.75) c += pick(h1(n + 2.0)) * softBox(vec2(xs, q.y) - cen, sz + vec2(streak, 0.0), b + 0.002) * 1.1;
+    // 店面橱窗：大块暖光
+    vec2 shop = vec2((n + 0.5) * cw, 0.64);
+    if (h1(n + 41.0) < 0.6) c += mix(SODIUM, pick(h1(n + 8.0)), 0.3) * softBox(vec2(xs, q.y) - shop, vec2(0.07 + 0.04 * h1(n + 3.0) + streak, 0.035), b + 0.003) * 0.45;
+  }
+  // 路灯：中景，灯头 + 雨里的大光晕
+  float xl = q.x + t * 0.22, lw = 0.55;
+  float cl = floor(xl / lw);
+  for (float k = -1.0; k <= 1.0; k++) {
+    vec2 d = vec2(xl - (cl + k + 0.5) * lw, q.y - 0.36);
+    c += SODIUM * (glowPt(d, 0.007, b, 0.004 * uBus) * 2.6 + glowPt(d, 0.07, b, 0.0) * 0.3);
+  }
+  return c;
+}
+// 公交车侧窗外的雨夜街景：远处楼群慢、路灯中速、招牌和车灯快
+vec3 scene(vec2 q, float b) {
+  float t = uTime * uBus;
+  vec3 col = mix(uSky0, uSky1, smoothstep(0.0, HZ, q.y));
+  col += mix(uLa, SODIUM, 0.4) * 0.14 * exp(-abs(q.y - HZ + 0.12) * 6.0);
+  // 远处楼群剪影和窗灯
+  float x = q.x + t * 0.03, cw = 0.075, aa = max(b, 0.0015);
+  float c0 = floor(x / cw), cov = 0.0;
+  for (float k = -1.0; k <= 1.0; k++) {
+    float n = c0 + k, lx = x - n * cw, top = HZ - 0.06 - 0.24 * h1(n);
+    float cv = smoothstep(-aa, aa, lx) * smoothstep(-aa, aa, cw * 0.92 - lx) * smoothstep(-aa, aa, q.y - top);
+    cov = max(cov, cv);
+    if (k == 0.0) {
+      vec2 g = vec2(lx / 0.011, (q.y - top) / 0.016);
+      vec2 f = fract(g), id = floor(g);
+      float lit = step(0.55, hash(id + n * 7.13));
+      float win = lit * smoothstep(0.3, 0.2, abs(f.x - 0.5)) * smoothstep(0.32, 0.22, abs(f.y - 0.5));
+      win = mix(win, 0.13, clamp(b / 0.006, 0.0, 1.0)) * cv * step(0.01, q.y - top);
+      col += mix(pick(hash(id + 1.7 + n)), (uLa + uLb + uLc) / 3.0, clamp(b / 0.006, 0.0, 1.0)) * win * 0.85;
+    }
+  }
+  col = mix(col, mix(uSky0, uSky1, 0.5) * 0.55, cov * 0.85);
+  col += lampsSigns(q, b, t);
+  // 湿路面和倒影
+  float road = smoothstep(ROAD - aa, ROAD + aa, q.y);
+  col = mix(col, uSky0 * 0.5, road * 0.85);
+  vec2 qr = vec2(q.x, ROAD - (q.y - ROAD) * 0.55);
+  col += lampsSigns(qr, b + 0.012, t) * road * 0.35;
+  // 车灯：同向车道尾灯（红），对向车道前灯（白），快速掠过拖出长影
+  for (float lane = 0.0; lane < 2.0; lane++) {
+    float sp = lane < 0.5 ? 0.55 : -1.1, ly = lane < 0.5 ? 0.76 : 0.83, ww = 0.9;
+    float xc = q.x + t * sp, cc = floor(xc / ww);
+    vec3 lc = lane < 0.5 ? vec3(1.0, 0.18, 0.12) : vec3(1.0, 0.95, 0.85);
+    for (float k = -1.0; k <= 1.0; k++) {
+      float n = cc + k + lane * 50.0;
+      if (h1(n) > 0.6) continue;
+      float cx = (cc + k + 0.2 + 0.6 * h1(n + 4.0)) * ww;
+      float st = abs(sp) * 0.03 * uBus;
+      c0 = glowPt(vec2(xc - cx + 0.035, q.y - ly), 0.004, b, st) + glowPt(vec2(xc - cx - 0.035, q.y - ly), 0.004, b, st);
+      col += lc * c0 * 2.2;
+      col += lc * glowPt(vec2(xc - cx, (q.y - ly) * 3.0 - 0.03), 0.02, b * 2.0, st) * road * 0.3;
+    }
+  }
+  // 窗外的雨：车在开，雨丝斜着往后划
+  vec2 rd = normalize(vec2(1.0, 0.5 + 0.4 / max(uBus, 0.2)));
+  vec2 r = vec2(dot(q, rd), dot(q, vec2(-rd.y, rd.x)));
+  float colId = floor(r.y / 0.007), hr = h1(colId);
+  float seg = fract(r.x * (1.5 + hr) + t * (2.5 + hr * 2.0) + hr * 10.0);
+  float line = smoothstep(0.0012 + b, 0.0, abs(fract(r.y / 0.007) - 0.5) * 0.007) * smoothstep(0.0, 0.1, seg) * smoothstep(0.3, 0.1, seg);
+  col += vec3(0.6, 0.7, 0.8) * line * 0.07 * step(0.55, hr) * (1.0 - clamp(b * 40.0, 0.0, 1.0));
+  return col;
+}
+void main() {
+  // 颠簸：玻璃上的东西（雾、擦痕、水珠）跟车身一起晃，窗外晃得更多
+  vec2 gv = vUv + uGlassShift, sv = vUv + uSceneShift;
+  vec2 px = gv * uRes;
+  float aspect = uRes.x / uRes.y;
+  vec2 q = vec2(sv.x * aspect, sv.y);
+  float m = texture(uMask, gv).r;
+  // 擦痕边缘：细噪声让边缘毛糙，大块噪声让重新起雾时一片片回来
+  float fine = vnoise(px / 6.0) * 0.6 + vnoise(px / 2.2) * 0.4;
+  float blotch = vnoise(px / 55.0 + 3.1);
+  float th = 0.3 + (fine - 0.5) * 0.22 * uEdge + (blotch - 0.5) * 0.12;
+  float clear = smoothstep(th - 0.05, th + 0.06, m);
+  // 雾：模糊的窗外提亮发灰，光晕散得更开，加浓淡起伏和细颗粒，下半部分略浓
+  float dens = uMist * (0.82 + 0.3 * vnoise(px / 380.0 + uTime * 0.015)) * (0.9 + 0.2 * vUv.y);
+  vec3 haze = vec3(0.70, 0.74, 0.78);
+  vec3 blur = scene(q, 0.03);
+  vec3 glow = scene(q, 0.09);
+  vec3 fog = blur * (1.0 - 0.45 * dens) + glow * 0.9 * dens + haze * 0.2 * dens;
+  fog += (hash(px) - 0.5) * 0.025;
+  fog += smoothstep(0.78, 0.98, vnoise(px / 1.6)) * 0.05 * dens;
+  // 水珠纹理：擦痕边 / 下淌的水珠 rd，雾上的凝结水珠 fd（擦开的地方没有）
+  vec4 rd = texture(uDrop, gv);
+  vec4 fd = texture(uField, gv) * (1.0 - clear);
+  // 和 raindrop-fx 一样，水珠周围一圈的雾也被抹掉
+  clear = max(clear, smoothstep(0.93, 1.0, rd.a));
+  vec3 col = fog;
+  if (clear > 0.001) {
+    // 擦开的地方：清晰的窗外，留一层很薄的水膜
+    vec3 wiped = scene(q, 0.0012) * 1.05 + haze * 0.02 * dens;
+    float rim = clear * (1.0 - clear) * 4.0;
+    col = mix(fog, wiped, clear) + rim * haze * 0.16 * dens;
+  }
+  // 合成方式照搬 raindrop-fx 的 compose.glsl：阈值成形、按法线折射清晰的窗外、按光照明暗
+  vec4 comp = vec4(rd.rgb + fd.rgb - 2.0 * rd.rgb * fd.rgb, max(rd.a, fd.a));
+  float dmask = smoothstep(0.96, 0.99, comp.a);
+  if (dmask > 0.001) {
+    vec2 nn = comp.rg - 0.5;
+    vec2 ruv = sv + vec2(-nn.x, nn.y) * (comp.b * 0.6 + 0.4) * uRefract;
+    // 雨窗 demo 用的是轻度模糊的背景、漫反射 0.2–0.5、高光指数 48
+    vec3 lens = scene(vec2(ruv.x * aspect, ruv.y), 0.006);
+    vec3 normal = normalize(vec3(nn * 2.0, 1.0));
+    vec3 lightDir = normalize(vec3(-1.0, 1.0, 2.0));
+    float lambert = clamp(dot(lightDir, normal), 0.0, 1.0);
+    float spec = pow(max(dot(normal, normalize(lightDir + vec3(0.0, 0.0, 1.0))), 0.0), 48.0);
+    lens += (lambert - 0.8) * vec3(0.3, 0.3, 0.32) + spec * vec3(0.3, 0.3, 0.33) * uGlint;
+    // 车厢里的灯照在水珠表面：比纯透过去的窗外亮一点，不会在灰白的雾上显成黑点
+    lens = max(lens, fog * 0.55) + haze * 0.08 * dens;
+    col = mix(col, lens, dmask);
+  }
+  outColor = vec4(col, 1.0);
+}`;
+function compile(type, src) {
+  const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog); gl.useProgram(prog);
+const vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+const aPos = gl.getAttribLocation(prog, 'aPos'); gl.enableVertexAttribArray(aPos); gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+// 注：主四边形用默认 VAO，水珠精灵用自己的 VAO
+const U = n => gl.getUniformLocation(prog, n);
+const uRes = U('uRes'), uTime = U('uTime'), uMist = U('uMist'), uEdge = U('uEdge'), uRefract = U('uRefract'), uBus = U('uBus'), uGlint = U('uGlint'), uGlassShift = U('uGlassShift'), uSceneShift = U('uSceneShift');
+function makeTex(unit, name) {
+  const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.uniform1i(U(name), unit);
+  return { t, unit };
+}
+const texMask = makeTex(2, 'uMask'), texDrop = makeTex(3, 'uDrop'), texField = makeTex(4, 'uField');
+function uploadTex(tex, src, mip) {
+  gl.activeTexture(gl.TEXTURE0 + tex.unit); gl.bindTexture(gl.TEXTURE_2D, tex.t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
+  if (mip) { gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); }
+}
+
+// 水珠精灵：实例化四边形画进水珠纹理，混合方式同 raindrop-fx 的 "smoother"
+const SPRITE_VS = `#version 300 es
+in vec2 aCorner; in vec4 aRect; in vec2 aParam;
+uniform vec2 uView;
+out vec2 vUV; out float vSize; out float vAlpha;
+void main() {
+  vec2 p = aRect.xy + (aCorner - 0.5) * aRect.zw;
+  vUV = aCorner; vSize = aParam.x; vAlpha = aParam.y;
+  gl_Position = vec4(p.x / uView.x * 2.0 - 1.0, p.y / uView.y * 2.0 - 1.0, 0.0, 1.0);
+}`;
+const SPRITE_FS = `#version 300 es
+precision mediump float;
+uniform sampler2D uSprite;
+in vec2 vUV; in float vSize; in float vAlpha; out vec4 o;
+void main() {
+  vec4 c = texture(uSprite, vUV);
+  c.a *= vAlpha;
+  o = vec4(c.rg * c.a, vSize * c.a, c.a);
+}`;
+const sprog = gl.createProgram();
+gl.attachShader(sprog, compile(gl.VERTEX_SHADER, SPRITE_VS)); gl.attachShader(sprog, compile(gl.FRAGMENT_SHADER, SPRITE_FS));
+gl.linkProgram(sprog);
+const sVao = gl.createVertexArray(); gl.bindVertexArray(sVao);
+const cornerBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, cornerBuf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]), gl.STATIC_DRAW);
+const aCorner = gl.getAttribLocation(sprog, 'aCorner'); gl.enableVertexAttribArray(aCorner); gl.vertexAttribPointer(aCorner, 2, gl.FLOAT, false, 0, 0);
+const instBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
+const aRect = gl.getAttribLocation(sprog, 'aRect'), aParam = gl.getAttribLocation(sprog, 'aParam');
+gl.enableVertexAttribArray(aRect); gl.vertexAttribPointer(aRect, 4, gl.FLOAT, false, 24, 0); gl.vertexAttribDivisor(aRect, 1);
+gl.enableVertexAttribArray(aParam); gl.vertexAttribPointer(aParam, 2, gl.FLOAT, false, 24, 16); gl.vertexAttribDivisor(aParam, 1);
+gl.bindVertexArray(null);
+const uView = gl.getUniformLocation(sprog, 'uView');
+gl.useProgram(sprog); gl.uniform1i(gl.getUniformLocation(sprog, 'uSprite'), 5); gl.useProgram(prog);
+const texSprite = { t: gl.createTexture(), unit: 5 };
+let spriteReady = false;
+{
+  const img = new Image();
+  img.onload = () => {
+    gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D, texSprite.t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    spriteReady = true; fieldDirty = true;
+  };
+  img.src = window.DROP_SPRITE_URL;
+}
+// 水珠纹理（CSS 分辨率）的帧缓冲
+function makeTarget(tex) {
+  gl.activeTexture(gl.TEXTURE0 + tex.unit); gl.bindTexture(gl.TEXTURE_2D, tex.t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  if (!tex.fb) tex.fb = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, tex.fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex.t, 0);
+  gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+function renderDrops(tex, inst) {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, tex.fb);
+  gl.viewport(0, 0, W, H);
+  gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+  if (inst.length && spriteReady) {
+    gl.useProgram(sprog); gl.bindVertexArray(sVao);
+    gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D, texSprite.t);
+    gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(inst), gl.DYNAMIC_DRAW);
+    gl.uniform2f(uView, W, H);
+    gl.enable(gl.BLEND);
+    gl.blendFuncSeparate(gl.ONE_MINUS_DST_COLOR, gl.ONE_MINUS_SRC_COLOR, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, inst.length / 6);
+    gl.disable(gl.BLEND);
+    gl.bindVertexArray(null); gl.useProgram(prog);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, cv.width, cv.height);
+}
+
+function resize() {
+  W = innerWidth; H = innerHeight; DPR = Math.min(2, devicePixelRatio || 1) * P.res;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  mask.width = Math.round(W * MASK_SCALE); mask.height = Math.round(H * MASK_SCALE);
+  makeTarget(texDrop); makeTarget(texField);
+  gl.viewport(0, 0, cv.width, cv.height);
+  fieldDirty = true; relayout();
+}
+
+// ---------- 主循环 ----------
+function frame() {
+  const now = performance.now() / 1000, T = songTime();
+  if (fieldDirty) { buildField(); fieldDirty = false; }
+  if (P.bumpRate > 0 && now > nextBump) {
+    if (nextBump > 0) triggerBump(now, 0.5 + bumpRnd() * 0.7);
+    nextBump = now + (3 + bumpRnd() * 9) / P.bumpRate;
+  }
+  drawMask(T, now);
+  uploadTex(texMask, mask);
+  renderDrops(texDrop, dynInst);
+  renderDrops(texField, fieldInstances(now));
+  const [sx, sy] = shakeAt(now);
+  gl.uniform2f(uGlassShift, -sx * 0.35 / W, -sy * 0.35 / H);
+  gl.uniform2f(uSceneShift, -sx / W, -sy / H);
+  gl.uniform2f(uRes, cv.width, cv.height); gl.uniform1f(uTime, now % 1000);
+  gl.uniform1f(uMist, P.mist); gl.uniform1f(uEdge, P.edge); gl.uniform1f(uRefract, P.refract); gl.uniform1f(uBus, P.bus); gl.uniform1f(uGlint, P.glint);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  const m = Math.floor(T / 60), s = Math.floor(T % 60);
+  $('time').textContent = `${m}:${String(s).padStart(2, '0')}`;
+  requestAnimationFrame(frame);
+}
+
+// ---------- 交互 ----------
+function writeFree(text) {
+  text = text.trim(); if (!text) return;
+  const now = performance.now() / 1000, per = 0.6;
+  const src = { chars: splitText(text).map((ch, i) => ({ ch, t: now + 0.2 + i * per, d: ch.startsWith('icon:') ? per * 2 : per })) };
+  const f = { src, seed: 1000 + freeLines.length, t: now, end: now + 0.2 + text.length * per };
+  f.chars = layoutLine(src, f.seed, W, H);
+  freeLines.push(f);
+}
+let drawing = null;
+cv.addEventListener('pointerdown', e => { drawing = { pts: [[e.clientX, e.clientY]], end: null }; fingerPaths.push(drawing); cv.setPointerCapture(e.pointerId); });
+cv.addEventListener('pointermove', e => { if (drawing) drawing.pts.push([e.clientX, e.clientY]); });
+const lift = () => { if (drawing) { drawing.end = performance.now() / 1000; drawing = null; } };
+cv.addEventListener('pointerup', lift); cv.addEventListener('pointercancel', lift);
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'h' || e.key === 'H') $('panel').classList.toggle('hide');
+  if (e.key === 'b' || e.key === 'B') triggerBump(performance.now() / 1000, 1);
+  if (e.key === ' ') { e.preventDefault(); $('play').click(); }
+});
+$('text').addEventListener('keydown', e => { if (e.key === 'Enter') { writeFree(e.target.value); e.target.value = ''; } });
+$('write').onclick = () => { writeFree($('text').value); $('text').value = ''; };
+$('play').onclick = () => {
+  if (!song.audio) { simStart = performance.now(); simT0 = 0; return; }
+  if (au.paused) { au.play(); $('play').textContent = '暂停'; } else { au.pause(); $('play').textContent = '播放'; }
+};
+const sel = $('song');
+for (const s of SONGS) { const o = document.createElement('option'); o.value = s.id; o.textContent = s.name; sel.appendChild(o); }
+sel.onchange = () => loadSong(sel.value);
+if (qs.has('hide')) $('panel').classList.add('hide');
+if (!window.STROKES) {
+  const h = document.createElement('div'); h.className = 'hint'; h.style.color = '#ffb36b';
+  h.textContent = '缺少 strokes.js：中日文会退回骨架追踪，笔顺不对。按 README 下载 AnimCJK 生成。';
+  $('panel').appendChild(h);
+}
+buildSliders();
+resize();
+sel.value = qs.get('song') || 'sample';
+loadSong(sel.value);
+if (simT0 !== null && song.audio) au.currentTime = simT0;
+if (qs.has('text')) writeFree(qs.get('text'));
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

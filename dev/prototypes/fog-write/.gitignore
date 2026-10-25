@@ -1,0 +1,5 @@
+# 本地测试歌曲（歌词、音频有版权），不进仓库
+data/
+audio/
+# 笔顺数据由 tools/build-strokes.mjs 生成，见 README
+strokes.js

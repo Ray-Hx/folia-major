@@ -203,7 +203,7 @@ export default async function viteConfig(_config: ConfigEnv): Promise<UserConfig
     .slice(0, 12)}`;
 
   return {
-    base: process.env.ELECTRON === 'true' ? './' : '/',
+    base: process.env.ELECTRON === 'true' || process.env.FOLIA_IOS === 'true' ? './' : '/',
     worker: {
       format: 'es'
     },
@@ -271,6 +271,7 @@ export default async function viteConfig(_config: ConfigEnv): Promise<UserConfig
       icuFoliaDataPlugin(),
       react(),
       VitePWA({
+        disable: process.env.FOLIA_IOS === 'true',
         registerType: 'autoUpdate',
         includeAssets: ['icon.svg'],
         devOptions: {

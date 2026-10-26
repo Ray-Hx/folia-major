@@ -1,3 +1,4 @@
+import { isNativeIOS } from '../../../../services/ios/native';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { MutableRefObject, RefObject } from 'react';
 import { PlayerState } from '../../../../types';
@@ -151,7 +152,7 @@ export function usePlaybackAudioBridge({
     const setupAudioAnalyzer = useCallback(() => {
         // The context is the sentinel, not the source node: a deck that failed to connect must
         // not let this run twice, because createMediaElementSource throws on a second call.
-        if (!audioRef.current || audioContextRef.current) return;
+        if (isNativeIOS() || !audioRef.current || audioContextRef.current) return;
         try {
             const AudioContextClass = window.AudioContext || (window as Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
             const ctx = new AudioContextClass();

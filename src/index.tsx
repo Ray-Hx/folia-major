@@ -1,3 +1,4 @@
+import { installIOSRuntime } from './services/ios/runtime';
 import { Buffer } from 'buffer';
 import { installGlobalVisualizerFrameRateLimiter } from './utils/frameRateLimiter';
 import { installConsoleLogCapture } from './utils/consoleLogBuffer';
@@ -22,4 +23,5 @@ installMemorySampleFeed();
 // if (import.meta.env.DEV) installCoverSizeAudit();
 installGlobalVisualizerFrameRateLimiter();
 
+installIOSRuntime();
 void import('./bootstrap');

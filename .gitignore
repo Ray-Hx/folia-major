@@ -96,3 +96,14 @@ __pycache__/
 
 # Built by build/buildPythonRuntime.mjs - binary artifacts that live on the mirrors, not in git.
 dist-runtime/
+
+# iOS build outputs and signing data
+ios/App/App/public/
+ios/App/App/capacitor.config.json
+ios/App/App/config.xml
+ios/DerivedData/
+ios/output/
+*.xcuserstate
+xcuserdata/
+*.mobileprovision
+*.p12

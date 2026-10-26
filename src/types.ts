@@ -1306,6 +1306,7 @@ export type ActiveLocalLyricsSource = 'local' | 'embedded' | 'online';
 export type LocalLyricsOrigin = 'sidecar' | 'upload';
 
 export interface LocalSong {
+  iosFilePath?: string; // Relative native Documents/Library filename; stable across app updates.
   id: string; // UUID for local file
   fileName: string;
   filePath: string; // File path for reference

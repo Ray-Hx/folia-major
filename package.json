@@ -60,7 +60,12 @@
     "contributors:add": "npx all-contributors-cli add",
     "contributors:generate": "npx all-contributors-cli generate",
     "models:fetch": "node build/fetchModels.mjs",
-    "manual:ai-probe": "node test/manual/ai_probe.mjs"
+    "manual:ai-probe": "node test/manual/ai_probe.mjs",
+    "build:ios": "cross-env FOLIA_IOS=true VITE_LIBRARY_INITIAL_SUITE=grid vite build && cap sync ios",
+    "ios:open": "cap open ios",
+    "ios:simulator": "node dev/ios/build.mjs simulator",
+    "ios:archive": "node dev/ios/build.mjs archive",
+    "ios:export": "node dev/ios/build.mjs export"
   },
   "build": {
     "appId": "top.izuna.foliamajor",
@@ -234,6 +239,8 @@
     }
   },
   "dependencies": {
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/ios": "^8.5.3",
     "@google/genai": "^2.24.0",
     "@neteasecloudmusicapienhanced/api": "4.41.1",
     "@xhayper/discord-rpc": "^1.5.1",
@@ -256,6 +263,7 @@
   },
   "devDependencies": {
     "@applemusic-like-lyrics/ttml": "^1.0.1",
+    "@capacitor/cli": "^8.5.3",
     "@chenglou/pretext": "^0.0.9",
     "@emnapi/core": "1.11.3",
     "@emnapi/runtime": "1.11.3",

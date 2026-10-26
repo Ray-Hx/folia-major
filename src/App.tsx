@@ -1,3 +1,6 @@
+import { useIOSPlayback } from './components/ios/useIOSPlayback';
+import { PlatformAudio } from './components/ios/PlatformAudio';
+import { isNativeIOS } from './services/ios/native';
 import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { AnimatePresence, motion, useMotionValueEvent } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -1125,13 +1128,15 @@ export default function App() {
         return () => registerLocalTrackFileReader(null);
     }, [getLocalStemBytes]);
 
+    useIOSPlayback(localSongs, playSong);
+
     const automix = useAutomixDecks({
         audioRef,
         audioContextRef,
         currentSongKeyRef: currentSongRef,
         coverUrl,
         loopMode: effectiveLoopMode,
-        isEnabled: automixEnabled && !isNowPlayingStageActive,
+        isEnabled: !isNativeIOS() && automixEnabled && !isNowPlayingStageActive,
         transition: transitionSettings,
         onAdvanceTrack: () => {
             // Same advance the end of a track would trigger, only early enough for the outgoing
@@ -2407,7 +2412,7 @@ export default function App() {
     // deck that is not currently active, so a track fading out in the background can never drive
     // the progress bar, the duration, the queue, or the player state.
     const renderAudioDeck = (deck: AutomixDeckId, register: (element: HTMLAudioElement | null) => void) => (
-        <audio
+        <PlatformAudio
             key={deck}
             ref={register}
             src={automix.deckSrc(deck)}

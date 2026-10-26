@@ -1,0 +1,62 @@
+/* Native safe areas are applied by FoliaViewController, including landscape cutouts.
+   The layout below uses the remaining canvas, not the physical screen dimensions. */
+html[data-native-ios] {
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;
+    --ios-visible-height: 100dvh;
+}
+html[data-native-ios] body, html[data-native-ios] #root {
+    margin: 0;
+    width: 100%;
+    height: var(--ios-visible-height);
+    overflow: hidden;
+}
+html[data-native-ios] .folia-app-shell {
+    height: var(--ios-visible-height);
+    max-height: 100dvh;
+}
+html[data-native-ios] button, html[data-native-ios] [role="button"], html[data-native-ios] input {
+    touch-action: manipulation;
+}
+html[data-native-ios] button:focus-visible, html[data-native-ios] input:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
+}
+html[data-native-ios] input:not([type="range"]):not([type="checkbox"]),
+html[data-native-ios] textarea {
+    font-size: max(16px, 1em);
+}
+html[data-native-ios] .st-window {
+    max-width: calc(100vw - 16px);
+    max-height: calc(var(--ios-visible-height) - 16px);
+}
+html[data-native-ios] .ios-settings-overlay {
+    padding: 8px;
+}
+html[data-native-ios] .ios-settings-window {
+    height: calc(var(--ios-visible-height) - 16px);
+}
+@media (pointer: coarse) {
+    html[data-native-ios] button:not([role="switch"]),
+    html[data-native-ios] [role="button"] {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    html[data-native-ios] input[type="range"] { min-height: 44px; }
+    html[data-native-ios] .st-scroll { -webkit-overflow-scrolling: touch; }
+}
+@media (max-width: 430px) {
+    html[data-native-ios] .ios-player-panel { padding-right: 8px; }
+    html[data-native-ios] .ios-player-surface { width: calc(100vw - 16px); }
+    html[data-native-ios] .ios-player-bar { padding-inline: 8px; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+    html[data-native-ios] .ios-player-surface {
+        width: min(360px, 52vw);
+        max-height: calc(var(--ios-visible-height) - 72px);
+    }
+    html[data-native-ios] .ios-settings-window { border-radius: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    html[data-native-ios] .st-page-in { animation: none; }
+}

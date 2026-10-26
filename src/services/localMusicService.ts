@@ -1,3 +1,5 @@
+import { isNativeIOS, nativeFileURL } from './ios/native';
+import { importIOSDocuments, readIOSFile } from './ios/localLibrary';
 import { LocalSong, LyricData, LocalLibrarySnapshot, LocalLibrarySnapshotFile, LocalLibrarySnapshotNode, type SongResult } from '../types';
 import { saveLocalSong, saveLocalSongs, deleteLocalSong as dbDeleteLocalSong, deleteLocalSongs as dbDeleteLocalSongs, saveDirHandles, getDirHandles, deleteDirHandle, getLocalSongs, getLocalLibrarySnapshot, saveLocalLibrarySnapshot, deleteLocalLibrarySnapshot } from './db';
 import { getLocalPlaylists, saveLocalPlaylists } from './localPlaylistService';
@@ -1122,6 +1124,7 @@ async function hydrateImportedSongsInBackground(rootFolderName: string, songs: L
 
 // Import folder using File System Access API (if supported)
 export async function importFolder(expectedRootName?: string): Promise<LocalSong[]> {
+    if (isNativeIOS()) return importIOSDocuments();
     // Request access in the user gesture before waiting for other library writes.
     try {
         const dirHandle = await getImportDirectoryHandle(expectedRootName);
@@ -1605,6 +1608,7 @@ async function cleanupDirHandleIfUnused(rootFolderName: string): Promise<void> {
 // Get audio blob from local song using fileHandle
 // Returns blob URL if fileHandle exists, null otherwise
 export async function getAudioFromLocalSong(song: LocalSong): Promise<string | null> {
+    if (isNativeIOS() && song.iosFilePath) return nativeFileURL(song.iosFilePath);
     const fileHandle = await getAccessibleFileHandle(song);
 
     if (fileHandle) {
@@ -1636,6 +1640,7 @@ export async function getAudioFromLocalSong(song: LocalSong): Promise<string | n
 
 /** Resolves the current File for playback recovery without changing the song or minting a URL. */
 export async function getFileFromLocalSong(song: LocalSong): Promise<File | null> {
+    if (isNativeIOS() && song.iosFilePath) return readIOSFile(song);
     const fileHandle = await getAccessibleFileHandle(song);
     if (fileHandle) {
         try {

@@ -1,3 +1,4 @@
+import { isNativeIOS } from '../services/ios/native';
 import { useCallback, useEffect, useState } from 'react';
 import { USER_GUIDE_AUTO_OPEN_VERSION } from '../components/modal/userGuideContent';
 import { hasOnboardingLibrarySuiteChoice } from '../library/app/librarySuiteChoice';
@@ -96,6 +97,8 @@ export const useStartupExperienceGate = () => {
     });
 
     useEffect(() => {
+        // iPhone starts directly in the library without desktop lessons or startup prompts.
+        if (isNativeIOS()) return;
         if (nextStep === 'release-notes') {
             setIsReleaseNotesOpen(true);
         } else if (nextStep === 'playback-entry-view') {

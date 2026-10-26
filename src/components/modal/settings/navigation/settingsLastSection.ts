@@ -1,3 +1,4 @@
+import { isIOSSettingAvailable } from '../../../ios/settingsAvailability';
 import type { SettingsSubviewId } from '../../../../stores/useSettingsModalStore';
 import { SETTINGS_NAV_GROUP_SPECS, type SettingsSectionId } from './settingsNavModel';
 
@@ -25,7 +26,7 @@ export interface SettingsSectionAvailability {
 export const getAvailableSettingsSectionIds = ({ isElectron }: SettingsSectionAvailability): SettingsSectionId[] => (
     SETTINGS_NAV_GROUP_SPECS
         .flatMap(group => group.sections)
-        .filter(section => !section.electronOnly || isElectron)
+        .filter(section => (!section.electronOnly || isElectron) && isIOSSettingAvailable(section.id))
         .map(section => section.id)
 );
 
@@ -112,7 +113,8 @@ export const resolveInitialSettingsSection = (
 ): SettingsSectionId => {
     const { initialSubview, hasInitialAnchor } = request;
     if (initialSubview || hasInitialAnchor) {
-        return sectionForSettingsSubview(initialSubview) ?? DEFAULT_SETTINGS_SECTION;
+        const section = sectionForSettingsSubview(initialSubview);
+        return section && getAvailableSettingsSectionIds(request).includes(section) ? section : DEFAULT_SETTINGS_SECTION;
     }
     return readLastSettingsSection(request, storage === undefined ? getDefaultStorage() : storage) ?? DEFAULT_SETTINGS_SECTION;
 };

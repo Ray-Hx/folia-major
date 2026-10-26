@@ -1,3 +1,4 @@
+import { isIOSSettingAvailable } from '../../../ios/settingsAvailability';
 import { Boxes, Contrast, Database, Gauge, Keyboard, LayoutGrid, Link2, Monitor, MonitorPlay, PlayCircle, SlidersHorizontal, Terminal, TextAlignStart, type LucideIcon } from 'lucide-react';
 // src/components/modal/settings/navigation/settingsNavModel.ts
 // Single source of truth for the settings categories: their order in the side list, their grouping,
@@ -95,7 +96,7 @@ export const buildSettingsNavGroups = (t: Translate, options: { isElectron: bool
             id: group.id,
             label: t(group.labelKey),
             items: group.sections
-                .filter(section => !section.electronOnly || options.isElectron)
+                .filter(section => (!section.electronOnly || options.isElectron) && isIOSSettingAvailable(section.id))
                 .map(section => ({
                     id: section.id,
                     icon: section.icon,

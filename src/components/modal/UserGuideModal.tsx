@@ -1,3 +1,4 @@
+import { isNativeIOS } from '../../services/ios/native';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Lightbulb } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -19,7 +20,7 @@ export const UserGuideModal: React.FC<{ theme?: Theme | null }> = ({ theme }) =>
 
     return (
         <AnimatePresence>
-            {isOpen && (
+            {!isNativeIOS() && isOpen && (
                 <motion.div
                     data-folia-keyboard-window="true"
                     data-testid="ponder-onboarding"

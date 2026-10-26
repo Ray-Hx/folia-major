@@ -1,3 +1,4 @@
+import { isIOSSettingAvailable } from '../../../ios/settingsAvailability';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { SettingsAnchor } from '../navigation/SettingsAnchorContext';
@@ -29,6 +30,8 @@ type GroupProps = {
 export const Group: React.FC<GroupProps> = ({ def, bare, action, preview, foot, children }) => {
     const { t } = useTranslation();
     const title = t(def.titleKey);
+
+    if (!isIOSSettingAvailable(def.id)) return null;
 
     return (
         <SettingsAnchor anchorId={def.id} label={title} className={GROUP_SPACING_CLASS}>

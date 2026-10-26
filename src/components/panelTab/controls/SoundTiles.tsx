@@ -27,7 +27,7 @@ const SoundTiles: React.FC<SoundTilesProps> = ({ loopMode, onToggleLoop, loopTog
     const LoopIcon = loopModeIcon(loopMode);
 
     return (
-        <div className="mt-2 grid grid-cols-3 gap-2">
+        <div className={`mt-2 grid ${isNativeIOS() ? 'grid-cols-1' : 'grid-cols-3'} gap-2`}>
             <QuickTile
                 kind="toggle"
                 icon={<LoopIcon size={18} />}
@@ -40,12 +40,11 @@ const SoundTiles: React.FC<SoundTilesProps> = ({ loopMode, onToggleLoop, loopTog
                     noteLoopButtonPress();
                 }}
             />
+            {!isNativeIOS() && <>
             <QuickTile
                 kind="toggle"
                 icon={<Blend size={18} />}
                 label={t('ui.automix')}
-                disabled={isNativeIOS()}
-                tip={isNativeIOS() ? t('ios.audioLimit') : undefined}
                 lit={automixEnabled}
                 onClick={() => toggleAutomix(!automixEnabled)}
             />
@@ -53,12 +52,11 @@ const SoundTiles: React.FC<SoundTilesProps> = ({ loopMode, onToggleLoop, loopTog
                 kind="open"
                 icon={<SlidersHorizontal size={18} />}
                 label={t('ui.equalizerTitle')}
-                disabled={isNativeIOS()}
-                tip={isNativeIOS() ? t('ios.audioLimit') : undefined}
                 lit={isEqualizerOn}
                 data-ponder="audio-equalizer"
                 onClick={openAudioEqualizer}
             />
+            </>}
         </div>
     );
 };

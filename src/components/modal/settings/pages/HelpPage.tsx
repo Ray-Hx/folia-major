@@ -1,3 +1,4 @@
+import { isNativeIOS } from '../../../../services/ios/native';
 import React from 'react';
 import { ChevronRight, CircleHelp, ExternalLink, Lightbulb, MessageCircle, Sparkles, Users, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -102,25 +103,25 @@ const HelpPage: React.FC<HelpPageProps> = ({ onOpenReleaseNotes, onOpenAiHelp, o
     return (
         <>
             <div className={`${COLUMNS_CLASS} mt-5 gap-y-3`}>
-                <Tile
+                {!isNativeIOS() && <Tile
                     testId="help-release-notes"
                     icon={Sparkles}
                     title={t('help.releaseNotes')}
                     line={t('help.releaseNotesDescription')}
                     onClick={onOpenReleaseNotes}
-                />
-                <Tile
+                />}
+                {!isNativeIOS() && <Tile
                     testId="help-page-ponder"
                     icon={Lightbulb}
                     title={t('help.ponder')}
                     line={t('help.ponderDescription')}
                     onClick={openPonderNavigation}
-                />
+                />}
             </div>
 
             {/* Each group is the first in a cell of its own, so the two headings stand level; the
                 cells then sit as far under the cards above as any group does. */}
-            <div className={`${COLUMNS_CLASS} mt-2 gap-y-2`}>
+            {!isNativeIOS() && <div className={`${COLUMNS_CLASS} mt-2 gap-y-2`}>
                 <div>
                     <Group def={SHORTCUTS}>
                         {HELP_TAB_PRIMARY_SHORTCUTS.map(shortcut => (
@@ -140,7 +141,7 @@ const HelpPage: React.FC<HelpPageProps> = ({ onOpenReleaseNotes, onOpenAiHelp, o
                         ))}
                     </Group>
                 </div>
-            </div>
+            </div>}
 
             <Group def={SUPPORT} bare>
                 <Row label={iconLabel(CircleHelp, t('aiHelp.openButton'))} onClick={onOpenAiHelp} />

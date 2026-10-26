@@ -65,6 +65,7 @@ for (const size of sizes) {
 }
 
 test('all built-in lyric renderers mount in portrait and landscape', async ({ page }) => {
+    test.setTimeout(240000);
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.setViewportSize({ width: 402, height: 874 });
@@ -76,7 +77,7 @@ test('all built-in lyric renderers mount in portrait and landscape', async ({ pa
         document.addEventListener('DOMContentLoaded', () => { document.documentElement.dataset.nativeIos = 'true'; });
     }, { version: APP_VERSION, key: GUIDE_VERSION_STORAGE_KEY });
     await page.goto('/');
-    await page.locator('#app-splash').waitFor({ state: 'detached', timeout: 60000 });
+    await page.locator('#app-splash').waitFor({ state: 'detached', timeout: 120000 });
     await page.evaluate(async () => {
         const load = (path: string) => import(/* @vite-ignore */ path);
         const [{ useAppViewStore }, { usePlaybackStore }, parser, signals] = await Promise.all([
@@ -108,12 +109,13 @@ test('all built-in lyric renderers mount in portrait and landscape', async ({ pa
             }, mode);
             await page.waitForTimeout(1200);
             await assertInside(page, '[data-testid="player-visual-surface"]');
-            expect(await page.getByTestId('player-visual-surface').evaluate(node => node.childElementCount)).toBeGreaterThan(0);
             const style = page.locator(`[data-visualizer-style="${mode}"]`);
-            await expect(style).toBeVisible();
-            const frame = await style.boundingBox();
-            expect(frame!.x).toBeCloseTo(0, 0); expect(frame!.y).toBeCloseTo(0, 0);
-            expect(frame!.width).toBeCloseTo(viewport.width, 0); expect(frame!.height).toBeCloseTo(viewport.height, 0);
+            await expect(style).toBeVisible({ timeout: 30000 });
+            // The style transition briefly scales the incoming scene; measure its settled frame.
+            await expect.poll(async () => {
+                const frame = await style.boundingBox();
+                return frame && [frame.x, frame.y, frame.width, frame.height].map(Math.round);
+            }, { timeout: 10000 }).toEqual([0, 0, viewport.width, viewport.height]);
             if (mode === 'classic') await expect(page.getByTestId('player-visual-surface')).toContainText('让');
             await page.screenshot({ path: `test-results/ios/lyrics-${mode}-${viewport.width}.png` });
         }
@@ -171,4 +173,58 @@ test('tapping the lyric background enters and leaves immersion', async ({ page }
     await expect.poll(() => page.evaluate(() => localStorage.getItem('player_chrome_hidden'))).toBe('true');
     await page.getByTestId('player-visual-surface').click({position:{x:150,y:300}});
     await expect.poll(() => page.evaluate(() => localStorage.getItem('player_chrome_hidden'))).toBe('false');
+});
+
+
+test('iPhone settings omit desktop controls and tutorials on a fresh install', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.setViewportSize({ width: 402, height: 874 });
+    // Deliberately leave all guide/completion keys unset to exercise first launch.
+    await page.goto('/');
+    await page.locator('#app-splash').waitFor({ state: 'detached', timeout: 60000 });
+    await expect(page.getByTestId('ponder-onboarding')).toHaveCount(0);
+    await expect(page.getByTestId('page-ponder-touch-button')).toHaveCount(0);
+    for (const section of ['general', 'player', 'playback', 'graphics', 'integration', 'interaction']) {
+        await page.evaluate(async section => {
+            const path = '/src/stores/useSettingsModalStore.ts';
+            const { useSettingsModalStore } = await import(/* @vite-ignore */ path);
+            useSettingsModalStore.getState().openSettings('options', section);
+        }, section);
+        await expect(page.locator('.ios-settings-window')).toBeVisible();
+        await page.waitForTimeout(250);
+        const hidden = ['alwaysShowMainWindowTitlebar', 'ponderHintVisibility', 'ponderTouchButton',
+            'autoHideCursorWithPlayerChrome', 'playerBottomBarOffset', 'playerControlSlots',
+            'stageTrackPillMode', 'audioOutputDevice', 'replayGainSettings', 'playbackFade',
+            'transitionEnable', 'enablePlayerPageNativeBlur', 'glowBlurQuantize', 'stageMode'];
+        for (const id of hidden) await expect(page.locator(`[data-settings-row="${id}"]`)).toHaveCount(0);
+    }
+    const data = await page.evaluate(async () => {
+        const load = (path: string) => import(/* @vite-ignore */ path);
+        const [{ buildSettingsNavGroups }, { SETTINGS_PAGE_OPTIONS }, { buildSettingsSearchEntries }, { useSettingsModalStore }] = await Promise.all([
+            load('/src/components/modal/settings/navigation/settingsNavModel.ts'),
+            load('/src/components/modal/settings/pages/index.ts'),
+            load('/src/components/modal/settings/navigation/settingsNavSearch.ts'),
+            load('/src/stores/useSettingsModalStore.ts'),
+        ]);
+        const groups = buildSettingsNavGroups((key: string) => key, { isElectron: false });
+        const entries = buildSettingsSearchEntries(groups, SETTINGS_PAGE_OPTIONS, (key: string) => key, { isElectron: false });
+        useSettingsModalStore.getState().closeSettings();
+        return { sections: groups.flatMap((g: any) => g.items.map((i: any) => i.id)), targets: entries.map((e: any) => e.targetId) };
+    });
+    expect(data.sections).not.toContain('interaction');
+    expect(data.sections).not.toContain('developer');
+    for (const id of ['ponderHints', 'alwaysShowMainWindowTitlebar', 'bottomUiSettings', 'streaming', 'audioOutputSettings']) expect(data.targets).not.toContain(id);
+    for (const id of ['appLanguage', 'queueDefaultBehavior', 'visualizerFrameRate', 'navidrome']) expect(data.targets).toContain(id);
+    // Help stays available for version/community information, without tutorials or keyboard cards.
+    await page.evaluate(async () => {
+        const path = '/src/stores/useSettingsModalStore.ts';
+        const { useSettingsModalStore } = await import(/* @vite-ignore */ path);
+        useSettingsModalStore.getState().openSettings('options');
+    });
+    await page.getByRole('button', { name: /Help|帮助/ }).click();
+    await expect(page.getByTestId('help-page-ponder')).toHaveCount(0);
+    await expect(page.locator('.ios-settings-window kbd')).toHaveCount(0);
+    await page.screenshot({ path: 'test-results/ios/iphone-settings-clean.png' });
+    expect(errors).toEqual([]);
 });

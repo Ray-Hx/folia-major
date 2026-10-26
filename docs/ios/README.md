@@ -65,3 +65,7 @@ The native runner backgrounds the simulator test host using Settings. It operate
 ## Immersive playback and clear materials (build 4)
 
 The lyric scene fills the display; only interactive chrome respects safe areas. Tap player background to hide or restore transport controls. iOS 26+ uses a native UIKit `UIGlassEffect(style: .clear)` transport; earlier systems use ultra-thin system material. Advanced controls and settings retain Folia React panels with translucent backgrounds and blur (12% control tint, 22% settings tint). These panels are not UIKit Liquid Glass. Reduced-transparency preferences use a more opaque fallback. Native and web transport controls no longer overlap; panel volume rows and tab touch areas have consistent sizes.
+
+## iPhone settings cleanup (build 5)
+
+Native iOS omits keyboard/window/cursor settings, web transport layout and old track-card controls, OBS/stage capture, desktop renderer workarounds and unavailable Web Audio processing. The same availability policy excludes these targets from settings search/navigation. Language, appearance, lyrics, queues, performance, Navidrome and configuration backup remain. Tutorial hosts, lightbulb/hover hints, loop-button guide notices and startup prompts are suppressed on iOS. Help keeps version/community information. Desktop behavior is retained.

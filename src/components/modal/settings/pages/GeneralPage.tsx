@@ -1,3 +1,4 @@
+import { isNativeIOS } from '../../../../services/ios/native';
 import React from 'react';
 import { RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -17,7 +18,7 @@ import { useSettingsPage } from './settingsPageContext';
 // hints of the Ponder tutorials.
 
 const LANGUAGE: SettingsGroupDef = { id: 'languageSettings', titleKey: 'options.languageSettings' };
-const LAUNCH: SettingsGroupDef = { id: 'labWindowAndTools', titleKey: 'options.settingsHeadingLaunch' };
+const LAUNCH: SettingsGroupDef = { id: 'labWindowAndTools', titleKey: isNativeIOS() ? 'ios.launch' : 'options.settingsHeadingLaunch' };
 const UPDATE: SettingsGroupDef = { id: 'updateCheck', titleKey: 'options.updateCheck', electronOnly: true };
 const PONDER: SettingsGroupDef = { id: 'ponderHints', titleKey: 'options.ponderHints' };
 

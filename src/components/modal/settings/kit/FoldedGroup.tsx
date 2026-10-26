@@ -1,3 +1,4 @@
+import { isIOSSettingAvailable } from '../../../ios/settingsAvailability';
 import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -63,6 +64,8 @@ export const FoldedGroup: React.FC<FoldedGroupProps> = ({ def, summary, children
         afterOpenRef.current = [];
         waiting.forEach(then => then());
     }, [requests]);
+
+    if (!isIOSSettingAvailable(def.id)) return null;
 
     return (
         <SettingsAnchor anchorId={def.id} label={title} className={GROUP_SPACING_CLASS}>

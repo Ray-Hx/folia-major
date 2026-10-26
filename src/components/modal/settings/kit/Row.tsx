@@ -1,3 +1,4 @@
+import { isIOSSettingAvailable } from '../../../ios/settingsAvailability';
 import React, { createContext, useContext, useId, useRef, useState } from 'react';
 import { ChevronRight, Info } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -79,6 +80,8 @@ export const Row: React.FC<RowProps> = ({ option, label, notice, hint, note, sub
             onClick?.();
         }
     };
+
+    if (option && (!isIOSSettingAvailable(option.id) || !isIOSSettingAvailable(option.group.id))) return null;
 
     return (
         <div

@@ -1,3 +1,4 @@
+import { isIOSSettingAvailable } from '../../../ios/settingsAvailability';
 // src/components/modal/settings/kit/options.ts
 // What a page declares about its groups and rows. The same object gives a group its heading and a
 // row its label, and is what the settings search lists and a landing looks for, so a name is
@@ -30,9 +31,9 @@ export type SettingsOptionDef = {
 
 /** Whether the page draws a group or a row here: what the search asks before it lists one. */
 export const isDrawnHere = (
-    def: Pick<SettingsGroupDef, 'electronOnly' | 'available'>,
+    def: Pick<SettingsGroupDef, 'electronOnly' | 'available'> & { id?: string },
     machine: { isElectron: boolean },
-): boolean => (machine.isElectron || !def.electronOnly) && def.available?.() !== false;
+): boolean => (machine.isElectron || !def.electronOnly) && def.available?.() !== false && (!def.id || isIOSSettingAvailable(def.id));
 
 export const option = (group: SettingsGroupDef, id: string, labelKey: string, marks?: Pick<SettingsOptionDef, 'electronOnly' | 'available'>): SettingsOptionDef => ({
     id,

@@ -1,3 +1,4 @@
+import { isNativeIOS } from '../ios/native';
 import { Lightbulb } from 'lucide-react';
 import i18n from '../../i18n/config';
 import { usePonderStore } from '../../stores/usePonderStore';
@@ -105,6 +106,7 @@ const presentHint = () => {
  * 挂起期间又点了就重新计时，一整串连点只会合并成一次提示。
  */
 export const noteLoopButtonPress = (now = Date.now()) => {
+    if (isNativeIOS()) return;
     const next = advanceLoopPressStreak(streak, now);
     streak = next.streak;
     if (!next.triggered && pendingHintTimer === null) {

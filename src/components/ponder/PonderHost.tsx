@@ -1,3 +1,4 @@
+import { isNativeIOS } from '../../services/ios/native';
 import React, { Suspense, lazy, useRef } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -89,4 +90,6 @@ const PonderHost: React.FC<PonderHostProps> = ({ theme, isDaylight }) => {
     );
 };
 
-export default PonderHost;
+const PlatformPonderHost: React.FC<PonderHostProps> = props => isNativeIOS() ? null : <PonderHost {...props} />;
+
+export default PlatformPonderHost;

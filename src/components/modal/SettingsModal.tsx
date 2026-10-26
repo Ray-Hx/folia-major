@@ -1,3 +1,4 @@
+import { isIOSSettingAvailable } from '../ios/settingsAvailability';
 import { iosGlassTokens } from '../ios/glassTokens';
 import { isNativeIOS } from '../../services/ios/native';
 import React, { useState, useEffect, useMemo, useRef, startTransition } from 'react';
@@ -280,7 +281,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     const resolvedToggleTransparentPlayerBackground = onToggleTransparentPlayerBackground ?? onToggleTransparentPlayerBackgroundFromStore;
     const setIsSubSettingsViewOpen = useSettingsModalStore(state => state.setIsSubSettingsViewOpen);
     // Help is a page of the same window, reached from the foot of the side list.
-    const [activeTab, setActiveTab] = useState<'help' | 'options'>(initialTab);
+    const [activeTab, setActiveTab] = useState<'help' | 'options'>(isNativeIOS() && initialTab === 'help' ? 'options' : initialTab);
     // A bare open (no subview, no anchor) restores the last section the user entered; any named target wins.
     const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>(() => resolveInitialSettingsSection({
         initialSubview,
@@ -335,14 +336,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     const shouldCloseModalOnSubviewBack = initialSubview !== null;
 
     useEffect(() => {
-        setActiveTab(initialTab);
+        setActiveTab(isNativeIOS() && initialTab === 'help' ? 'options' : initialTab);
         setShowVisPlayground(initialSubview === 'visualizer');
         setShowThemePark(initialSubview === 'themePark');
         setShowLyricFilterSettings(initialSubview === 'lyricFilter');
         setShowGlobalLyricOffset(initialSubview === 'globalLyricOffset');
 
         const targetSection = sectionForSettingsSubview(initialSubview);
-        if (targetSection) {
+        if (targetSection && isIOSSettingAvailable(targetSection)) {
             // 这两个是播放页歌词区里的二级面板，关掉后应该落回它们的入口所在分区。
             setActiveSettingsSection(targetSection);
             // 只有真正进入某个分区页才记忆；二级面板和调参台不算「进入」分区。

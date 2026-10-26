@@ -1,3 +1,5 @@
+import { isIOSSettingAvailable } from '../../ios/settingsAvailability';
+import { isNativeIOS } from '../../../services/ios/native';
 import { syncNow } from '../../../services/sync/syncCoordinator';
 import { isSyncConfigured } from '../../../services/sync/syncConfig';
 import { buildObsCustomCss } from '../../../services/obs/obsCustomCss';
@@ -725,3 +727,16 @@ export const settingsCommands: CommandPaletteCommand[] = [
     createAppLanguageCommand('settings-language-en', 'en', 'Switch language to English', 'Use English in the interface', ['english', 'interface english', '英文']),
     createAppLanguageCommand('settings-language-in', 'in', 'Switch language to Indonesian', 'Use Bahasa Indonesia in the interface', ['indonesian', 'bahasa indonesia', 'indonesia', '印尼语', 'bhs'])
 ];
+
+// Match the iPhone settings surfaces, including direct commands to removed tutorial controls.
+for (const command of settingsCommands) {
+    const available = command.isAvailable;
+    command.isAvailable = context => (
+        !(isNativeIOS() && command.id.includes('ponder'))
+        && (!command.settingsTarget || (
+            isIOSSettingAvailable(command.settingsTarget.subview)
+            && (!command.settingsTarget.anchorId || isIOSSettingAvailable(command.settingsTarget.anchorId))
+        ))
+        && (available?.(context) ?? true)
+    );
+}

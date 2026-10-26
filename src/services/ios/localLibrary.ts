@@ -10,7 +10,7 @@ export async function readIOSFile(song: LocalSong): Promise<File | null> {
     if (!song.iosFilePath) return null;
     const { uri } = await FoliaNative.getDocument({ path: song.iosFilePath });
     const response = await fetch(documentWebURL(uri));
-    if (!response.ok) throw new Error(`Local file read failed: ${response.status}`);
+    if (!response.ok && response.status !== 0) throw new Error(`Local file read failed: ${response.status}`);
     return new File([await response.blob()], song.fileName, { type: song.mimeType });
 }
 
@@ -20,7 +20,7 @@ export async function importIOSDocuments(): Promise<LocalSong[]> {
     // One file at a time keeps lossless imports from exhausting WKWebView's memory.
     for (const entry of files) {
         const response = await fetch(documentWebURL(entry.uri));
-        if (!response.ok) throw new Error(`Import read failed: ${response.status}`);
+        if (!response.ok && response.status !== 0) throw new Error(`Import read failed: ${response.status}`);
         const file = new File([await response.blob()], entry.name);
         const meta = await parseEmbeddedMetadataAsync(file, true) ?? {};
         const cover = meta.cover ? await prepareLocalCoverBlob(meta.cover) : null;

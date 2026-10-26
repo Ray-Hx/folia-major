@@ -1,3 +1,5 @@
+import { isNativeIOS } from '../../../../services/ios/native';
+import { IOSCollectionGrid } from '../../../../components/ios/IOSCollectionGrid';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Map as MapIcon } from 'lucide-react';
@@ -147,10 +149,10 @@ export const DesktopGrid3DSurface: React.FC<DesktopGrid3DSurfaceProps> = ({
                 types) sits right under the header's view capsule, the library actions on the right
                 under the search box. The row itself lets clicks through to the grid; only the
                 controls take them. */}
-            <div className="pointer-events-none absolute inset-x-0 top-2 z-10">
-                <div className="mx-auto grid w-full max-w-7xl grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 md:px-8">
+            <div className="ios-collection-toolbar pointer-events-none absolute inset-x-0 top-2 z-10">
+                <div className="ios-collection-controls mx-auto grid w-full max-w-7xl grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 md:px-8">
                     <div />
-                    <div className="flex justify-center">
+                    <div className="ios-collection-tabs flex justify-center">
                         {(!isLoading || tabs.length > 0) && (
                             <GridViewTabs
                                 tabs={tabs}
@@ -165,7 +167,7 @@ export const DesktopGrid3DSurface: React.FC<DesktopGrid3DSurfaceProps> = ({
 
                     <div className="flex min-w-0 justify-end">
                         {actions.length > 0 && (
-                            <div data-ponder={ponderControls} className="pointer-events-auto flex flex-wrap items-center justify-end gap-2">
+                            <div data-ponder={ponderControls} className="ios-collection-actions pointer-events-auto flex flex-wrap items-center justify-end gap-2">
                                 {actions.map(action => (
                                     <button
                                         key={action.id}
@@ -186,7 +188,7 @@ export const DesktopGrid3DSurface: React.FC<DesktopGrid3DSurfaceProps> = ({
                 </div>
             </div>
 
-            <Grid3DSlider
+            {isNativeIOS() ? <IOSCollectionGrid items={visibleItems} onSelect={handleVisibleSelect} isLoading={isLoading} emptyMessage={emptyMessage} isInteractive={isInteractive && !showGridMap} isDaylight={isDaylight} /> : <Grid3DSlider
                 key={focusMemoryScope}
                 items={visibleItems}
                 focusedIndex={visibleFocusedIndex}
@@ -197,7 +199,7 @@ export const DesktopGrid3DSurface: React.FC<DesktopGrid3DSurfaceProps> = ({
                 emptyMessage={emptyMessage}
                 isDaylight={isDaylight}
                 hasFloatingPlayer={hasFloatingPlayer}
-            />
+            />}
 
             <AnimatePresence onExitComplete={handleGridMapExitComplete}>
                 {showGridMap && (

@@ -1,3 +1,4 @@
+import { isNativeIOS } from './ios/native';
 // src/services/lyricProxy.ts
 
 /**
@@ -20,7 +21,7 @@ type LyricProxyBridge = NonNullable<Window['electron']>['fetchLyricProxy'];
 
 /** The relay's address on the web for one target URL. */
 export const lyricProxyWebUrl = (targetUrl: string): string => (
-    `/api/lyric-proxy?url=${encodeURIComponent(targetUrl)}`
+    isNativeIOS() ? targetUrl : `/api/lyric-proxy?url=${encodeURIComponent(targetUrl)}`
 );
 
 /**

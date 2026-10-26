@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import './i18n/config';
+import i18n from './i18n/config';
+import { isNativeIOS } from './services/ios/native';
 import './index.css';
 import './components/ios/mobile.css';
 import App from './App';
@@ -43,6 +44,11 @@ const FIRST_SCREEN_MOD_WAIT_MS = 1500;
 // here, for every surface this bundle mounts, rather than inside App so the remote-control and OBS
 // roots are covered too and App.tsx does not grow. See utils/nativeDragGuard.ts.
 installNativeDragGuard();
+if (isNativeIOS()) {
+    for (const language of ['en', 'zh-CN', 'zh-TW', 'in']) {
+        i18n.addResource(language, 'translation', 'localMusic.importFolder', i18n.t('ios.importAudio', { lng: language }));
+    }
+}
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

@@ -1,3 +1,4 @@
+import { isNativeIOS } from '../../services/ios/native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
@@ -60,6 +61,7 @@ const AppShell: React.FC<AppShellProps> = ({
     children,
 }) => {
     const { t } = useTranslation();
+    const nativeIOS = isNativeIOS();
     const layoutRootRef = useRef<HTMLDivElement>(null);
     usePlayerOverlayRoot(layoutRootRef, isPlayerView, { top: usesCustomWindowChrome ? TITLEBAR_REVEAL_HEIGHT : 0, right: 0, bottom: 0, left: 0 });
     usePlayerOverlayReservation('window-titlebar-reveal', 'window', titlebarRevealArea, usesCustomWindowChrome);
@@ -154,7 +156,7 @@ const AppShell: React.FC<AppShellProps> = ({
 
     return (
         <div
-            ref={layoutRootRef}
+            ref={nativeIOS ? undefined : layoutRootRef}
             className="folia-app-shell fixed inset-0 w-full h-full flex flex-col overflow-hidden font-sans transition-colors duration-500"
             style={{
                 ...appStyle,
@@ -219,7 +221,7 @@ const AppShell: React.FC<AppShellProps> = ({
             {audioElement}
             <SettingsKitThemeContext.Provider value={kitTheme}>
                 <SheetLayerContext.Provider value={sheetLayer}>
-                    {children}
+                    {nativeIOS ? <div ref={layoutRootRef} className="ios-safe-content">{children}</div> : children}
                 </SheetLayerContext.Provider>
             </SettingsKitThemeContext.Provider>
             {/* Dialogs are drawn here: after every page and window of the app, inside its colour variables. */}

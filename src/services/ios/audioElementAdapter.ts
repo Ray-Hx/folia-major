@@ -22,8 +22,10 @@ export function attachNativeAudio(element: HTMLAudioElement, readSource: () => s
         state = next;
         updatedAt = performance.now();
         if (next.error) {
-            error = { code: 4, message: next.error } as MediaError;
-            emit('error');
+            if (next.error !== error?.message) {
+                error = { code: 4, message: next.error } as MediaError;
+                emit('error');
+            }
             return;
         }
         error = null;
@@ -62,13 +64,16 @@ export function attachNativeAudio(element: HTMLAudioElement, readSource: () => s
     const originalGetAttribute = element.getAttribute.bind(element);
     Object.defineProperties(element, {
         currentTime: { configurable: true, get: () => {
-            const elapsed = state.playing && !document.hidden ? (performance.now() - updatedAt) / 1000 : 0;
+            const elapsed = state.playing && state.advancing !== false && !document.hidden ? (performance.now() - updatedAt) / 1000 : 0;
             return Math.min(state.duration || Infinity, state.position + elapsed);
         }, set: (position: number) => {
             if (!Number.isFinite(position) || peekNativeAdoption(readSource() ?? '')) return;
             state = { ...state, position: Math.max(0, position) };
             updatedAt = performance.now();
-            void pendingLoad.then(() => FoliaNative.seek({ position })).catch(fail);
+            const source = readSource();
+            void pendingLoad.then(() => {
+                if (!disposed && source === readSource()) return FoliaNative.seek({ position });
+            }).catch(fail);
         } },
         duration: { configurable: true, get: () => state.duration || NaN },
         paused: { configurable: true, get: () => !state.playing },
@@ -89,8 +94,9 @@ export function attachNativeAudio(element: HTMLAudioElement, readSource: () => s
     element.getAttribute = name => name === 'src' ? readSource() ?? null : originalGetAttribute(name);
     element.load = () => { void load().catch(fail); };
     element.play = async () => {
+        const source = readSource();
         await load();
-        if (disposed) return;
+        if (disposed || source !== readSource()) throw new DOMException('Track changed', 'AbortError');
         const adopted = finishNativeAdoption(readSource() ?? '');
         if (!adopted || adopted.playing) await FoliaNative.play();
         apply(await FoliaNative.getState());

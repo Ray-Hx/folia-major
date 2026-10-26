@@ -1,3 +1,4 @@
+import { isNativeIOS } from '../../../../services/ios/native';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
@@ -111,11 +112,11 @@ const PlaybackPage: React.FC = () => {
 
     return (
         <>
-            <Group def={TRANSITION}>
+            <Group def={TRANSITION} foot={isNativeIOS() ? t('ios.audioLimit') : undefined}>
                 <Row option={O.transition}>
-                    <Toggle checked={automix.enabled} onChange={automix.setEnabled} />
+                    <Toggle disabled={isNativeIOS()} checked={!isNativeIOS() && automix.enabled} onChange={automix.setEnabled} />
                 </Row>
-                <Reveal when={automix.enabled}>
+                <Reveal when={!isNativeIOS() && automix.enabled}>
                     <Row sub option={O.mode} hint={modeHint}>
                         {/* The mode that runs is not always the chosen one: Automix that cannot
                             measure a track runs as a crossfade, and without the models as the
@@ -192,11 +193,11 @@ const PlaybackPage: React.FC = () => {
                 <AudioOutputDeviceRow option={O.outputDevice} onDeviceChange={onAudioOutputDeviceChange} />
                 <Row option={O.replayGain} note={t('options.replayGainModeDesc')}>
                     <Segmented
-                        value={replayGainMode}
+                        value={isNativeIOS() ? 'off' : replayGainMode}
                         options={[
                             { value: 'off', label: t('localMusic.replayGainOff') },
-                            { value: 'track', label: t('localMusic.replayGainTrack') },
-                            { value: 'album', label: t('localMusic.replayGainAlbum') },
+                            { value: 'track', label: t('localMusic.replayGainTrack'), disabled: isNativeIOS() },
+                            { value: 'album', label: t('localMusic.replayGainAlbum'), disabled: isNativeIOS() },
                         ]}
                         onChange={onReplayGainModeChange}
                     />

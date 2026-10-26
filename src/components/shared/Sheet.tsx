@@ -276,7 +276,7 @@ const SheetFrame: React.FC<SheetFrameProps> = ({
             // What hasOpenSheet (utils/keyboardTargets) looks for.
             data-folia-sheet={isPresent ? 'true' : undefined}
             inert={!isPresent}
-            className={`fixed inset-0 z-[200] flex justify-center p-4 ${restHeight ? 'items-start' : 'items-center'}`}
+            className={`ios-dialog-overlay fixed inset-0 z-[200] flex justify-center p-4 ${restHeight ? 'items-start' : 'items-center'}`}
             style={restHeight
                 ? { ...overlayTokens(isDaylight, theme), paddingTop: `max(16px, calc(50vh - ${restHeight / 2}px))` }
                 : overlayTokens(isDaylight, theme)}

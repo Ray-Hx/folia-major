@@ -1,3 +1,4 @@
+import { planNativeQueue } from '../../services/ios/queuePlan';
 import { beginNativeAdoption } from '../../services/ios/nativeAdoption';
 import { useEffect, useRef } from 'react';
 import type { LocalSong, SongResult } from '../../types';
@@ -7,7 +8,7 @@ import { useAudioSettingsStore } from '../../stores/useAudioSettingsStore';
 import { FoliaNative, isNativeIOS, nativeFileURL, type NativeTrack } from '../../services/ios/native';
 import { getSongArtistLabel, getSongAlbumLabel, getSongCoverUrl } from '../../services/onlineMusic/songMetadata';
 import { getNavidromeConfig, navidromeApi } from '../../services/navidromeService';
-import { resolveNavidromePlaybackCarrier } from '../../utils/appPlaybackGuards';
+import { getPlaybackSongKey, resolveNavidromePlaybackCarrier } from '../../utils/appPlaybackGuards';
 
 // Publish fully resolved local/server queues before backgrounding; reconcile the UI on return.
 export function useIOSPlayback(localSongs: LocalSong[], playSong: (song: SongResult, queue?: SongResult[]) => unknown) {
@@ -24,22 +25,23 @@ export function useIOSPlayback(localSongs: LocalSong[], playSong: (song: SongRes
         const tracks: NativeTrack[] = [];
         const nextMap = new Map<string, SongResult>();
         const config = getNavidromeConfig();
-        for (const song of queue.length ? queue : currentSong ? [currentSong] : []) {
+        const candidates = (queue.length ? queue : currentSong ? [currentSong] : []).map(song => {
             const local = localSongs.find(item => item.id === (song as SongResult & { localRef?: { songId: string } }).localRef?.songId);
             const nav = resolveNavidromePlaybackCarrier(song);
-            const url = song === currentSong && audioSrc ? audioSrc
+            const key = getPlaybackSongKey(song);
+            const url = currentSong && key === getPlaybackSongKey(currentSong) && audioSrc ? audioSrc
                 : local?.iosFilePath ? nativeFileURL(local.iosFilePath)
                 : config && nav ? navidromeApi.getStreamUrl(config, (nav as NavidromeSong).navidromeData.id) : null;
-            // Unresolved provider URLs must never silently skip a track in a native queue.
-            if (!url || url.startsWith('blob:')) {
-                if (tracks.length) break;
-                continue;
-            }
+            return { key, url, value: song };
+        });
+        const plan = planNativeQueue(candidates, currentSong ? getPlaybackSongKey(currentSong) : '', loop);
+        for (const { url, value: song } of plan.entries) {
+            if (!url) continue;
             nextMap.set(url, song);
             tracks.push({ url, title: song.name, artist: getSongArtistLabel(song), album: getSongAlbumLabel(song), artwork: getSongCoverUrl(song) || undefined });
         }
         mapping.current = nextMap;
-        void FoliaNative.setQueue({ tracks, loop }).catch(error => console.error('[iOSAudio] Queue sync failed', error));
+        void FoliaNative.setQueue({ tracks, loop: plan.loop }).catch(error => console.error('[iOSAudio] Queue sync failed', error));
     }, [queue, currentSong, audioSrc, localSongs, loop]);
     useEffect(() => {
         if (!isNativeIOS()) return;

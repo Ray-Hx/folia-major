@@ -1,3 +1,4 @@
+import { isNativeIOS } from '../../ios/native';
 import { NoCopyrightRecommendation, SongPrivilege, SongResult } from "../../../types";
 import { readProviderSessionValue, removeProviderSessionValue, writeProviderSessionValue } from '../providerStorage';
 import { OnlineProviderError } from '../../../types/onlineMusic';
@@ -183,6 +184,11 @@ const eitherSignal = (caller: AbortSignal | null | undefined, limit: AbortSignal
 // the sign-in's limit; an HTTP error answer to it throws NeteaseLoginHttpError instead of being read as
 // an answer. 'online': a song's address or a collection's tracks, with the limit of online requests.
 const fetchWithCreds = async (endpoint: string, options: RequestInit = {}, limit?: 'sign-in' | 'online') => {
+  if (isNativeIOS() && !getConfiguredApiBase()) {
+    const { requestIOSNetease } = await import('./iosNetease');
+    const send = (signal?: AbortSignal) => requestIOSNetease(endpoint, { ...options, ...(signal ? { signal: eitherSignal(options.signal, signal) } : {}) });
+    return limit === 'sign-in' ? withLoginRequestLimit(send) : withOnlineRequestLimit(send, NETEASE_ONLINE_REQUEST_LIMIT_MS);
+  }
   const base = await getApiBase();
   const url = `${base}${endpoint}`;
   // Ensure we send credentials to persist session (cookies)

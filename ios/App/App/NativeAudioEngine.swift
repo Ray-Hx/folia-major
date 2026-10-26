@@ -17,6 +17,7 @@ final class NativeAudioEngine {
     private var artworkURL = ""
     private var artwork: MPMediaItemArtwork?
     private var lastEvent = "state"
+    private var commandTargets: [(MPRemoteCommand, Any)] = []
 
     init() {
         timeObservation = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.25, preferredTimescale: 600), queue: .main) { [weak self] _ in
@@ -54,25 +55,29 @@ final class NativeAudioEngine {
             }
         })
         let commands = MPRemoteCommandCenter.shared()
-        commands.playCommand.addTarget { [weak self] _ in
+        bind(commands.playCommand) { [weak self] _ in
             do { try self?.play(); return .success } catch { return .commandFailed }
         }
-        commands.pauseCommand.addTarget { [weak self] _ in self?.pause(); return .success }
-        commands.togglePlayPauseCommand.addTarget { [weak self] _ in
+        bind(commands.pauseCommand) { [weak self] _ in self?.pause(); return .success }
+        bind(commands.togglePlayPauseCommand) { [weak self] _ in
             guard let self else { return .commandFailed }
             if self.player.rate > 0 { self.pause() } else { try? self.play() }
             return .success
         }
-        commands.changePlaybackPositionCommand.addTarget { [weak self] event in
+        bind(commands.changePlaybackPositionCommand) { [weak self] event in
             guard let value = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
             self?.seek(value.positionTime); return .success
         }
-        commands.nextTrackCommand.addTarget { [weak self] _ in self?.advance(1) == true ? .success : .noSuchContent }
-        commands.previousTrackCommand.addTarget { [weak self] _ in
+        bind(commands.nextTrackCommand) { [weak self] _ in self?.advance(1) == true ? .success : .noSuchContent }
+        bind(commands.previousTrackCommand) { [weak self] _ in
             guard let self else { return .commandFailed }
             if self.player.currentTime().seconds > 3 { self.seek(0); return .success }
             return self.advance(-1) ? .success : .noSuchContent
         }
+    }
+
+    private func bind(_ command: MPRemoteCommand, handler: @escaping (MPRemoteCommandEvent) -> MPRemoteCommandHandlerStatus) {
+        commandTargets.append((command, command.addTarget(handler: handler)))
     }
 
     func load(_ url: String, nativeURL: String? = nil) throws {
@@ -119,7 +124,10 @@ final class NativeAudioEngine {
             next = (next + tracks.count) % tracks.count
         }
         guard let url = tracks[next]["url"] else { return false }
-        do { try load(url); try play(); publish(event: "trackChanged"); return true }
+        do {
+            if url == source { seek(0) } else { try load(url) }
+            try play(); publish(event: "trackChanged"); return true
+        }
         catch { publish(event: "error"); return false }
     }
 
@@ -127,7 +135,7 @@ final class NativeAudioEngine {
         let duration = player.currentItem?.duration.seconds ?? 0
         let position = player.currentTime().seconds
         var state: [String: Any] = ["url": source, "position": position.isFinite ? position : 0,
-            "duration": duration.isFinite ? duration : 0, "playing": player.rate > 0,
+            "duration": duration.isFinite ? duration : 0, "playing": player.rate > 0, "advancing": player.timeControlStatus == .playing,
             "event": lastEvent == "ended" ? "ended" : event]
         if let error = player.currentItem?.error { state["error"] = error.localizedDescription }
         return state
@@ -172,5 +180,6 @@ final class NativeAudioEngine {
         if let timeObservation { player.removeTimeObserver(timeObservation) }
         tokens.forEach(NotificationCenter.default.removeObserver)
         artworkTask?.cancel()
+        for (command, target) in commandTargets { command.removeTarget(target) }
     }
 }

@@ -14,6 +14,7 @@ export interface NativeAudioState {
     position: number;
     duration: number;
     playing: boolean;
+    advancing?: boolean;
     event: string;
     error?: string;
 }

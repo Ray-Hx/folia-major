@@ -1,3 +1,5 @@
+import { isNativeIOS } from '../../services/ios/native';
+import { IOSWelcome } from '../ios/IOSWelcome';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Sheet, SheetButton } from '../shared/Sheet';
@@ -29,7 +31,7 @@ const ReleaseNotesDialog: React.FC<ReleaseNotesDialogProps> = ({ isOpen, isDayli
             footer={<SheetButton data-testid="release-notes-close" onClick={onClose}>{t('ui.close')}</SheetButton>}
         >
             <div data-testid="release-notes-dialog">
-                <NewFeaturesIntro />
+                {isNativeIOS() ? <IOSWelcome /> : <NewFeaturesIntro />}
             </div>
         </Sheet>
     );

@@ -1,6 +1,7 @@
 
 
 export default {
+  "ios": {"importAudio": "Impor berkas musik", "audioLimit": "iPhone menggunakan audio native untuk pemutaran latar belakang dan layar kunci. Crossfade, EQ, dan ReplayGain desktop belum tersedia. Atur AirPlay dan volume di Pusat Kontrol.", "welcome": "Lirik, warna, dan musik favorit. Kini selalu bersama Anda.", "filesTitle": "Mulai dari berkas Anda", "filesBody": "Impor musik ke pustaka lokal. Berkas tersimpan di iPhone dan dapat diputar luring.", "playbackTitle": "Musik terus berjalan", "playbackBody": "Audio latar belakang dan kontrol layar kunci, dengan antrean native untuk musik lokal dan Navidrome.", "lyricsTitle": "Lirik bergerak", "lyricsBody": "Animasi lirik, tema, dan pengaturan asli. Penyedia daring memerlukan alamat layanan; efek audio khusus desktop belum tersedia."},
   "libraryBravais": {
     "suiteName": "Dinding Bravais",
     "homeTitle": "Pustaka",

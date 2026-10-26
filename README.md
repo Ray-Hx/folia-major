@@ -31,6 +31,8 @@ Lyrics Reimagined // 辞曲新境
 
 </div>
 
+本分支提供 iPhone 移植版本，优先适配 iPhone 16 Pro：[构建、安装与功能边界](docs/ios/README.zh-CN.md)。
+
 ## 项目简介
 
 Folia是一个以全屏沉浸式歌词播放为核心的在线音乐播放器，支持网易云、酷狗、QQ 音乐、Navidrome 和本地音乐库，桌面端还支持波点音乐、YouTube Music、Spotify 和汽水音乐，通过智能歌词匹配，AI生成配色主题，以及多种全屏歌词动画为用户提供独特的听歌体验。

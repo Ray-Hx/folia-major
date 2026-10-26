@@ -1,3 +1,4 @@
+import { fitIOSGridBox } from '../../../../components/ios/gridLayout';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useMotionValue, animate, AnimatePresence, useDragControls, useIsPresent } from 'framer-motion';
 import { ChevronLeft, ListPlus, RefreshCw } from 'lucide-react';
@@ -415,8 +416,8 @@ const ArtistGridView: React.FC<ArtistGridViewProps> = ({
     // Layout values for different container size breakpoints
     const layoutConfig = useMemo(() => {
         const box = resolveArtistGridCardBox(containerSize.width);
-        return squareCards ? squareGridCardBox(box) : box;
-    }, [containerSize.width, squareCards]);
+        return fitIOSGridBox(squareCards ? squareGridCardBox(box) : box, containerSize.height);
+    }, [containerSize.width, containerSize.height, squareCards]);
 
     // Coordinate motion values mapping grid drags. The camera is where the page's first render
     // needs it: where it was left when an album was opened from the page, else on the biography
@@ -1290,7 +1291,7 @@ const ArtistGridView: React.FC<ArtistGridViewProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={pageExit}
-            className="fixed inset-0 z-50 flex flex-col font-sans select-none overflow-hidden"
+            className="ios-fullscreen-grid fixed inset-0 z-50 flex flex-col font-sans select-none overflow-hidden"
             style={{ color: 'var(--text-primary)', backgroundColor: 'var(--bg-color)' }}
         >
             {/* 「我是当前这层网格」的标记，放在根节点里：移形换影的测量只在这个子树里找落点，
@@ -1311,7 +1312,7 @@ const ArtistGridView: React.FC<ArtistGridViewProps> = ({
             )}
 
             {/* Header Area */}
-            <div className="absolute top-0 left-0 p-6 z-30 flex items-center gap-4">
+            <div className="ios-grid-back-group absolute top-0 left-0 p-6 z-30 flex items-center gap-4">
                 <button
                     // 返回按钮表示看完了（onDone）：宿主清掉浏览会话、让每套 suite 忘掉布局记录，再返回
                     // （Escape 与浏览器后退保留）。P4.5 起这条语义在宿主，不在这里清。
@@ -1344,7 +1345,7 @@ const ArtistGridView: React.FC<ArtistGridViewProps> = ({
                     setShowSidePanel(false);
                     setShowCutInPanel(current => !current);
                 }}
-                className="group/grid-title absolute left-1/2 top-5 -translate-x-1/2 z-[70] text-center flex flex-col items-center select-none cursor-pointer hover:scale-[1.01] active:scale-98 transition-all px-5 py-2 rounded-2xl backdrop-blur-md"
+                className="ios-grid-heading group/grid-title absolute left-1/2 top-5 -translate-x-1/2 z-[70] text-center flex flex-col items-center select-none cursor-pointer hover:scale-[1.01] active:scale-98 transition-all px-5 py-2 rounded-2xl backdrop-blur-md"
                 style={{
                     backgroundColor: 'color-mix(in srgb, var(--bg-color) 20%, transparent)',
                     color: 'var(--text-primary)',
@@ -1385,7 +1386,7 @@ const ArtistGridView: React.FC<ArtistGridViewProps> = ({
                         if (loadError) artistActions.reload();
                         else if (backgroundLoadFailed) artistActions.retryAlbums();
                     }}
-                    className="absolute right-6 top-5 z-[70] flex items-center gap-2 rounded-full px-3 py-2 text-xs backdrop-blur-md"
+                    className="ios-grid-status absolute right-6 top-5 z-[70] flex items-center gap-2 rounded-full px-3 py-2 text-xs backdrop-blur-md"
                     style={{ backgroundColor: 'color-mix(in srgb, var(--bg-color) 65%, transparent)' }}
                     title={t('playlist.loading')}
                 >

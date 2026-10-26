@@ -297,12 +297,13 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
         <div
             ref={gridRootRef}
             data-ponder-page-scope="grid-page"
-            className={`relative w-full h-full flex flex-col font-sans overflow-hidden ${mainBg} pointer-events-auto backdrop-blur-sm ${bottomPadding}`}
+            data-ios-home-tone={isDaylight ? 'light' : 'dark'}
+            className={`ios-home-root relative w-full h-full flex flex-col font-sans overflow-hidden ${mainBg} pointer-events-auto backdrop-blur-sm ${bottomPadding}`}
         >
 
             {/* Main Header Container (Fades out when sliding/interacting) */}
             <div className="transition-opacity duration-300 ease-in-out z-20 opacity-100 select-none">
-                <div className="grid grid-cols-2 md:grid-cols-3 items-center w-full max-w-7xl mx-auto p-4 md:p-8 gap-y-4 md:gap-y-0">
+                <div className="ios-home-header grid grid-cols-2 md:grid-cols-3 items-center w-full max-w-7xl mx-auto p-4 md:p-8 gap-y-4 md:gap-y-0">
                     {/* Left title and settings */}
                     <div className="flex items-center justify-start order-1 md:order-none">
                         <h1 className="text-2xl font-bold tracking-tight opacity-90 flex items-center gap-3">
@@ -383,7 +384,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                     </div>
 
                     {/* Center Tab Switcher */}
-                    <div className="flex justify-center order-3 md:order-none col-span-2 md:col-span-1">
+                    <div className="ios-home-tabs flex justify-center order-3 md:order-none col-span-2 md:col-span-1">
                         <div className={`relative ${navPillBg} backdrop-blur-md p-1 rounded-full scale-90 md:scale-100 origin-center`}>
                             <div className="inline-flex items-center gap-0">
                                 {homeTabs.map((tab) => {
@@ -458,7 +459,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                     </div>
 
                     {/* Right Search Bar */}
-                    <div className="flex justify-end order-2 md:order-none">
+                    <div className="ios-home-search flex justify-end order-2 md:order-none">
                         <form onSubmit={handleSearch} className="relative w-full md:w-56 transition-all focus-within:md:w-72">
                             {isSearchingActive ? (
                                 <Loader2 className="absolute left-3 top-1/2 w-4 h-4 animate-spin opacity-40 -mt-2" />

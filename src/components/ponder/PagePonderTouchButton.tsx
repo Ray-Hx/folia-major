@@ -1,3 +1,4 @@
+import { isNativeIOS } from '../../services/ios/native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Lightbulb } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -41,6 +42,7 @@ const PagePonderTouchButton: React.FC<PagePonderTouchButtonProps> = ({ theme, is
     const calm = useReducedMotionFor('uiMicroMotion');
     const isCoarsePointer = !useSupportsFinePointer();
     const hasSession = usePonderStore(state => state.session !== null);
+    const isSettingsOpen = useSettingsModalStore(state => state.settingsModalState.isOpen);
     const isOnboardingOpen = useSettingsModalStore(state => state.isUserGuideModalOpen);
     const showTouchButton = usePonderStore(state => state.showPonderTouchButton);
     const view = useAppViewStore(state => state.view);
@@ -113,7 +115,7 @@ const PagePonderTouchButton: React.FC<PagePonderTouchButtonProps> = ({ theme, is
         return () => window.removeEventListener('pointerdown', handlePointerDown, { capture: true });
     }, [isCoarsePointer, reveal, showTouchButton]);
 
-    if (!isCoarsePointer || !showTouchButton || hasSession || isOnboardingOpen) {
+    if (!isCoarsePointer || !showTouchButton || hasSession || isOnboardingOpen || (isNativeIOS() && isSettingsOpen)) {
         return null;
     }
 

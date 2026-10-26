@@ -752,7 +752,7 @@ export const neteaseApi = {
   },
 
   createQr: async (key: string) => {
-    return fetchWithCreds(`/login/qr/create?key=${key}&qrimg=true`, {}, 'sign-in');
+    return fetchWithCreds(`/login/qr/create?key=${key}&qrimg=true${isNativeIOS() ? '&platform=web' : ''}`, {}, 'sign-in');
   },
 
   checkQr: async (key: string) => {

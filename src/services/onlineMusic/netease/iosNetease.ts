@@ -2,6 +2,7 @@ import { CapacitorHttp } from '@capacitor/core';
 import QRCode from 'qrcode';
 import modules from 'virtual:ios-netease-routes';
 import { readProviderSessionValue } from '../providerStorage';
+import { iosNeteaseCookies, keepIOSNeteaseCookies, iosNeteaseQRURL } from './iosNeteaseSession';
 
 // Native iOS calls NetEase directly; pure payload/response modules come from the pinned upstream API.
 type Answer = { status: number; body: Record<string, any>; cookie: string[] };
@@ -16,7 +17,7 @@ export async function requestIOSNetease(endpoint: string, options: RequestInit =
     const request: Request = async (uri, payload, settings = {}) => {
         if (!uri.startsWith('/api/') || uri.includes('..') || uri.includes('?')) throw new Error('Invalid NetEase API route');
         if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-        const cookie = typeof settings.cookie === 'string' ? settings.cookie : query.cookie;
+        const cookie = iosNeteaseCookies(typeof settings.cookie === 'string' ? settings.cookie : query.cookie);
         const csrf = /(?:^|;\s*)__csrf=([^;]+)/.exec(cookie)?.[1] ?? '';
         const body = new URLSearchParams();
         for (const [key, value] of Object.entries({ ...payload, csrf_token: csrf, e_r: false })) {
@@ -37,10 +38,11 @@ export async function requestIOSNetease(endpoint: string, options: RequestInit =
         if (response.status >= 400) throw Object.assign(new Error(`NetEase returned HTTP ${response.status}`), { httpStatus: response.status });
         const setCookie = Object.entries(response.headers).find(([key]) => key.toLowerCase() === 'set-cookie')?.[1] ?? '';
         const cookies = String(setCookie).split(/,(?=\s*[^;,=\s]+=[^;,]*)/).map(value => value.trim().split(';')[0]).filter(Boolean);
+        keepIOSNeteaseCookies(cookies);
         return { status: 200, body: data, cookie: cookies };
     };
     if (url.pathname === '/login/qr/create') {
-        const qrurl = `https://music.163.com/login?codekey=${encodeURIComponent(query.key)}`;
+        const qrurl = iosNeteaseQRURL(String(query.key), iosNeteaseCookies(query.cookie));
         return { code: 200, data: { qrurl, qrimg: await QRCode.toDataURL(qrurl, { margin: 1, width: 256 }) } };
     }
     if (url.pathname === '/song/url/v1') {

@@ -5,13 +5,13 @@ Priority device: iPhone 16 Pro. Minimum deployment target: iOS 17. Tests ran wit
 ## Passed
 
 - TypeScript type check and bundled iOS production build / Capacitor resource sync.
-- 95 targeted unit tests across nine files: native audio-element adaptation, queue boundaries, foreground adoption, playback source routing, direct NetEase QR/session response contracts, login host, catalogue request routing and existing grid contracts.
+- 97 targeted unit tests across nine files: native audio-element adaptation, queue boundaries, foreground adoption, playback source routing, direct NetEase QR/session response contracts, login host, catalogue request routing and existing grid contracts.
 - Nine hosted XCTest tests, using real AVPlayer and generated PCM audio: full-display WebView plus safe content in portrait/landscape; actual playback, seek, pause and Now Playing metadata; queue advancement without JavaScript; advancement while the test host is backgrounded by launching Settings; single-repeat and end-of-queue; one-item list-repeat; path/scheme rejection; cache chunk round-trip; sandbox file fetch through the real Capacitor bridge and metadata worker.
 - Native geometry: portrait WebView **402 × 874 pt**, content **402 × 778 pt**, top/bottom insets 62/34 pt. Landscape WebView **874 × 402 pt**, content **750 × 362 pt**, left/right insets 62 pt and top/bottom 20 pt. Background fills the display; safe content is measured separately. The earlier implementation inset the entire WebView and produced black bars; it has been replaced.
 - WebKit touch checks passed on six sizes for home, search, settings, rotation and horizontal overflow. After the edge-to-edge change, the iPhone 16 Pro cases were repeated at 402 × 874 and 874 × 402. All 15 built-in lyric modes mounted in both orientations; the classic mode additionally asserted actual lyric text. This is a rendering/geometry check, not proof of every animation's visual quality or frame rate.
 - Manual native simulator flow: system Files picker → select generated WAV → import → collection → play; playback progress advanced. Imported catalogue survived app relaunch. Mobile collection overview uses touch cards and scrolling actions. Collection return controls avoid status-bar overlap. Landscape song cards use a horizontal cover/text layout; the home overview uses compact horizontal collection cards.
 - Real NetEase service: QR key obtained through native HTTP; QR rendered locally in the app; reopening generated a different QR and remained in the waiting-for-scan state. Anonymous search returned a result. No third-party relay was used, and no account was authorized by the agent.
-- Release archive, development IPA export and strict/deep code-signature verification succeeded. The exact exported delivery app (0.7.22, build 2) was installed and launched on the connected physical iPhone 16 Pro after final layout verification.
+- Release archive, development IPA export and strict/deep code-signature verification succeeded. The exact exported delivery app (0.7.22, build 3) was installed and launched on the connected physical iPhone 16 Pro after final layout verification.
 
 ## Reproduction
 
@@ -38,4 +38,14 @@ The native runner's full log is in ignored `ios/output/native-tests.log`. XCTest
 - [Landscape home](screenshots/iphone16pro-home-landscape.png)
 - [Landscape collection](screenshots/iphone16pro-collection-landscape.png)
 
-Delivery artifact: ignored `ios/output/Folia-iPhone16Pro.ipa`, 11,565,189 bytes. Build 2 uses the full-display layout and direct NetEase QR transport. The old `Folia.ipa` in the output directory predates these fixes.
+Delivery artifact: ignored `ios/output/Folia-iPhone16Pro.ipa`, 11,565,688 bytes. Build 3 uses the full-display layout and direct NetEase QR transport. The old `Folia.ipa` in the output directory predates these fixes.
+
+## Follow-up: QR authorization rejected as an abnormal environment
+
+Build 2 generated a QR but account-owner scanning was reported as blocked. A displayed QR and waiting-state response did not establish successful authorization.
+
+The iOS QR URL omitted the web `chainId` added by the upstream's fix for the same symptom ([upstream commit](https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced/commit/4f4aa134d53704932b9fe0e09b7170f2a2451731)). Build 3 includes the upstream-compatible web chain ID, based on the same persistent installation/session cookie used for key creation and polling. Server-issued session cookies are retained across these requests. Account credentials remain owned by the account store and are not duplicated in the transport cookie jar.
+
+Seven direct-transport tests now cover the chain ID, session continuity, waiting state, authenticated-cookie handling, sign-out isolation and catalogue routing. All 97 targeted regression tests and type checking passed. Successful account-owner authorization remains unverified until the new QR is scanned; this change is not a guarantee that NetEase will accept the client.
+
+Build 3 release export passed strict/deep code-signature verification, and the exact exported app was installed and launched on the connected iPhone 16 Pro. A screenshot of the running simulator app's QR was decoded with Vision: its destination was the official HTTPS music.163.com endpoint and it contained both `codekey` and the web `chainId`. The QR/session identifiers and cookies are not included in this record or committed screenshots.

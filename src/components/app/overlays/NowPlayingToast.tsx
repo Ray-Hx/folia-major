@@ -1,3 +1,4 @@
+import { isNativeIOS } from '../../../services/ios/native';
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Music } from 'lucide-react';
@@ -131,6 +132,9 @@ const NowPlayingToast: React.FC<NowPlayingToastProps> = ({
         observer.observe(frame);
         return () => observer.disconnect();
     }, [visible]);
+
+    // Native transport already presents the track; a second bottom card would overlap it.
+    if (isNativeIOS()) return null;
 
     return (
         <AnimatePresence>

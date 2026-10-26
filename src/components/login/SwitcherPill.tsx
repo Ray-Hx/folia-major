@@ -110,7 +110,7 @@ const SwitcherPill: React.FC<SwitcherPillProps> = ({ account, onBackToPlayer }) 
         <div
             ref={setRootNode}
             data-testid="online-provider-switcher"
-            className="pointer-events-auto absolute bottom-4 right-4 z-[100] md:bottom-6 md:right-6"
+            className="ios-account-pill pointer-events-auto absolute bottom-4 right-4 z-[100] md:bottom-6 md:right-6"
             style={{ ...settingsTokens(isDaylight, theme), ...kitMotionTokens(reduced), '--login-edge': 'var(--st-menu)' } as React.CSSProperties}
         >
             <div className="flex items-center rounded-[26px] bg-[var(--st-menu)] p-0.5 text-[color:var(--st-t1)] shadow-lg md:p-1.5">

@@ -21,6 +21,7 @@
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
 		A8291917A65B4E17A589639C /* NativePlaybackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39B39C31998E455AB2E54764 /* NativePlaybackTests.swift */; };
+		3D8388C91E024C76BB9D82EB /* NativePlayerChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76981F8334324689B4A8F515 /* NativePlayerChrome.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -41,6 +42,7 @@
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		195A1D8D0F6344D4A937A977 /* FoliaTests.xctest */ = {isa = PBXFileReference; name = "FoliaTests.xctest"; path = "FoliaTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; explicitFileType = "wrapper.cfbundle"; includeInIndex = 0; };
 		39B39C31998E455AB2E54764 /* NativePlaybackTests.swift */ = {isa = PBXFileReference; name = "NativePlaybackTests.swift"; path = "FoliaTests/NativePlaybackTests.swift"; sourceTree = "<group>"; fileEncoding = 4; lastKnownFileType = sourcecode.swift; includeInIndex = 0; };
+		76981F8334324689B4A8F515 /* NativePlayerChrome.swift */ = {isa = PBXFileReference; name = "NativePlayerChrome.swift"; path = "NativePlayerChrome.swift"; sourceTree = "<group>"; fileEncoding = 4; lastKnownFileType = sourcecode.swift; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -96,6 +98,7 @@
 				504EC3131FED79650016851F /* Info.plist */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
+				76981F8334324689B4A8F515 /* NativePlayerChrome.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -213,6 +216,7 @@
 				F011B0000000000000000000 /* NativeAudioEngine.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
+				3D8388C91E024C76BB9D82EB /* NativePlayerChrome.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -361,7 +365,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -383,7 +387,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (

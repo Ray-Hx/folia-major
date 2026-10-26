@@ -1,5 +1,8 @@
+import { installNativeEnvironment } from './nativeEnvironment';
 import { test, expect, type Page } from '@playwright/test';
 import { APP_VERSION, GUIDE_VERSION_STORAGE_KEY } from '../helpers/appState';
+
+test.beforeEach(async ({ page }) => { await installNativeEnvironment(page); });
 
 // Exercise actual home, settings and player DOM using WebKit's coarse-pointer viewport.
 const sizes = [
@@ -106,10 +109,66 @@ test('all built-in lyric renderers mount in portrait and landscape', async ({ pa
             await page.waitForTimeout(1200);
             await assertInside(page, '[data-testid="player-visual-surface"]');
             expect(await page.getByTestId('player-visual-surface').evaluate(node => node.childElementCount)).toBeGreaterThan(0);
-            await expect(page.locator(`[data-visualizer-style="${mode}"]`)).toBeVisible();
+            const style = page.locator(`[data-visualizer-style="${mode}"]`);
+            await expect(style).toBeVisible();
+            const frame = await style.boundingBox();
+            expect(frame!.x).toBeCloseTo(0, 0); expect(frame!.y).toBeCloseTo(0, 0);
+            expect(frame!.width).toBeCloseTo(viewport.width, 0); expect(frame!.height).toBeCloseTo(viewport.height, 0);
             if (mode === 'classic') await expect(page.getByTestId('player-visual-surface')).toContainText('让');
             await page.screenshot({ path: `test-results/ios/lyrics-${mode}-${viewport.width}.png` });
         }
     }
     expect(errors).toEqual([]);
+});
+
+test('iPhone panel dock and body remain separate in both orientations', async ({ page }) => {
+    await page.addInitScript(({ version, key }) => {
+        localStorage.setItem(key, version); localStorage.setItem('folia_last_seen_guide_version', version);
+        localStorage.setItem('library_suite_prompt_seen', 'true'); localStorage.setItem('library_suite', 'grid');
+    }, { version: APP_VERSION, key: GUIDE_VERSION_STORAGE_KEY });
+    await page.goto('/');
+    await page.locator('#app-splash').waitFor({ state:'detached', timeout:60000 });
+    await page.evaluate(async () => {
+        const path = '/src/stores/useAppViewStore.ts'; const {useAppViewStore} = await import(/* @vite-ignore */ path);
+        useAppViewStore.getState().setView('player'); useAppViewStore.getState().setPanelTab('controls');
+        useAppViewStore.getState().setIsPanelOpen(true);
+    });
+    for (const viewport of [{width:402,height:874}, {width:874,height:402}]) {
+        await page.setViewportSize(viewport); await page.waitForTimeout(500);
+        const surface = page.getByTestId('unified-panel-surface');
+        await expect(surface).toBeVisible(); await assertInside(page, '[data-testid="unified-panel-surface"]');
+        const boxes = await surface.locator('[data-ponder-panel-tab-button]').evaluateAll(nodes => nodes.map(node => {
+            const r = node.getBoundingClientRect(); return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,height:r.height};
+        }));
+        expect(boxes.length).toBeGreaterThan(3);
+        for (let i=0;i<boxes.length;i++) {
+            expect(boxes[i].height).toBeGreaterThanOrEqual(40);
+            if (i) expect(boxes[i-1].right).toBeLessThanOrEqual(boxes[i].x + 1);
+        }
+        const dock = await surface.locator('.ios-panel-dock').boundingBox();
+        const scroll = await surface.locator('.st-scroll').boundingBox();
+        expect(scroll!.y + scroll!.height).toBeLessThanOrEqual(dock!.y + 1);
+        await page.screenshot({path:`test-results/ios/control-panel-${viewport.width}.png`});
+    }
+});
+
+test('tapping the lyric background enters and leaves immersion', async ({ page }) => {
+    await page.setViewportSize({width:402,height:874});
+    await page.addInitScript(({version,key}) => {
+        localStorage.setItem(key,version); localStorage.setItem('folia_last_seen_guide_version',version);
+        localStorage.setItem('library_suite_prompt_seen','true'); localStorage.setItem('library_suite','grid');
+    }, {version:APP_VERSION,key:GUIDE_VERSION_STORAGE_KEY});
+    await page.goto('/');
+    await page.locator('#app-splash').waitFor({state:'detached',timeout:60000});
+    await page.evaluate(async () => {
+        const p = '/src/stores/useAppViewStore.ts'; const c = '/src/stores/useAppChromeStore.ts';
+        const {useAppViewStore} = await import(/* @vite-ignore */ p);
+        const {useAppChromeStore} = await import(/* @vite-ignore */ c);
+        useAppChromeStore.getState().setIsPlayerChromeHidden(false);
+        useAppViewStore.getState().setView('player');
+    });
+    await page.getByTestId('player-visual-surface').click({position:{x:150,y:300}});
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('player_chrome_hidden'))).toBe('true');
+    await page.getByTestId('player-visual-surface').click({position:{x:150,y:300}});
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('player_chrome_hidden'))).toBe('false');
 });

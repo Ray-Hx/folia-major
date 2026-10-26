@@ -224,6 +224,7 @@ const VisualizerShell = forwardRef<HTMLDivElement, VisualizerShellProps>(({
                 <motion.button
                     type="button"
                     aria-label={t('ui.backToHome')}
+                    data-ios-visualizer-back
                     initial={false}
                     animate={{
                         opacity: isBackButtonVisible ? 1 : 0,

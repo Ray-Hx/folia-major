@@ -68,6 +68,15 @@ final class NativePlaybackTests: XCTestCase {
             XCTAssertEqual(content[1], safe.minY, accuracy: 1)
             XCTAssertEqual(content[2], safe.width, accuracy: 1)
             XCTAssertEqual(content[3], safe.height, accuracy: 1)
+            for _ in 0..<100 {
+                if (try? await web.evaluateJavaScript("!!document.querySelector('[data-visualizer-style]')")) as? Bool == true { break }
+                try await Task.sleep(nanoseconds: 100_000_000)
+            }
+            let lyricFrame = try await web.evaluateJavaScript("(() => { const r = document.querySelector('[data-visualizer-style]').getBoundingClientRect(); return [r.x,r.y,r.width,r.height]; })()") as! [Double]
+            XCTAssertEqual(lyricFrame[0], 0, accuracy: 1)
+            XCTAssertEqual(lyricFrame[1], 0, accuracy: 1)
+            XCTAssertEqual(lyricFrame[2], window.bounds.width, accuracy: 1)
+            XCTAssertEqual(lyricFrame[3], window.bounds.height, accuracy: 1)
             let attachment = XCTAttachment(image: UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
                 window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
             })
@@ -76,6 +85,48 @@ final class NativePlaybackTests: XCTestCase {
             add(attachment)
             print("[FoliaNativeTest] Safe canvas \(frame.width)x\(frame.height), insets \(window.safeAreaInsets)")
         }
+    }
+
+    func testNativeGlassTransportControlsAndLayout() async throws {
+        let window = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap { $0.windows }.first!
+        let chrome = NativePlayerChrome()
+        chrome.attach(to: window)
+        defer { chrome.removeFromSuperview() }
+        chrome.present(["shown":true, "light":false, "labels":["play":"Play", "pause":"Pause", "seek":"Position"]])
+        chrome.update(["duration":10.0, "position":2.0, "playing":false])
+        window.layoutIfNeeded()
+        XCTAssertFalse(chrome.isHidden)
+        XCTAssertGreaterThan(chrome.bounds.width, 300)
+        XCTAssertLessThanOrEqual(chrome.frame.maxY, window.safeAreaLayoutGuide.layoutFrame.maxY)
+        if #available(iOS 26.0, *) { XCTAssertTrue(chrome.effect is UIGlassEffect) }
+        else { XCTAssertTrue(chrome.effect is UIBlurEffect) }
+        func descendants(_ view: UIView) -> [UIView] { view.subviews.flatMap { [$0] + descendants($0) } }
+        let children = descendants(chrome)
+        let play = children.first { $0.accessibilityIdentifier == "folia-native-toggle" } as! UIButton
+        XCTAssertEqual(play.accessibilityLabel, "Play")
+        var action = ""
+        chrome.onAction = { action = $0 }
+        play.sendActions(for: .touchUpInside)
+        XCTAssertEqual(action, "toggle")
+        let slider = children.compactMap { $0 as? UISlider }.first!
+        var position = 0.0
+        chrome.onSeek = { position = $0 }
+        slider.value = 0.5
+        slider.sendActions(for: .valueChanged)
+        XCTAssertEqual(position, 5, accuracy: 0.01)
+        chrome.update(["duration":10.0, "position":5.0, "playing":true])
+        XCTAssertEqual(play.accessibilityLabel, "Pause")
+        chrome.present(["shown":false])
+        XCTAssertTrue(chrome.isHidden)
+    }
+
+    func testPausedItemPublishesReadyDuration() async throws {
+        let url = try track(seconds: 6)
+        var publishedDuration = 0.0
+        engine.onState = { publishedDuration = $0["duration"] as? Double ?? 0 }
+        try engine.load(url)
+        try await waitFor { _ in publishedDuration > 5 }
+        XCTAssertFalse(engine.snapshot()["playing"] as! Bool)
     }
 
     func testRealPlaybackSeekPauseAndMetadata() async throws {

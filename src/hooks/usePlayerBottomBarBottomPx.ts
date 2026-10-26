@@ -1,3 +1,4 @@
+import { isNativeIOS } from '../services/ios/native';
 import { useEffect } from 'react';
 import { useSpring, useTransform, type MotionValue } from 'framer-motion';
 import { playerBottomBarLiveOffset } from '../stores/motionSignals';
@@ -75,6 +76,6 @@ export const usePlayerSubtitleBottomPx = (isPlayerChromeHidden: boolean): Motion
         ([presence, offset]: number[]) => resolvePlayerSubtitleBottomFromPresence(
             isBottomBarHost ? offset : previewOffset,
             presence,
-        ),
+        ) + (isBottomBarHost && isNativeIOS() ? presence * 48 : 0),
     );
 };

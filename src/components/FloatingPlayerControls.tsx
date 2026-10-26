@@ -1,3 +1,4 @@
+import { isNativeIOS } from '../services/ios/native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -318,7 +319,7 @@ const FloatingPlayerControls: React.FC<FloatingPlayerControlsProps> = ({
         }
     };
 
-    if (hideControlBar) {
+    if (hideControlBar || isNativeIOS()) {
         return null;
     }
 

@@ -1,3 +1,5 @@
+import { iosGlassTokens } from '../../ios/glassTokens';
+import { isNativeIOS } from '../../../services/ios/native';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useTransform, type MotionStyle } from 'framer-motion';
 import type { Theme } from '../../../types';
@@ -57,17 +59,19 @@ type PanelSurfaceProps = Omit<PanelShellProps, 'isOpen' | 'handle'> & {
 
 const PanelSurface: React.FC<PanelSurfaceProps> = ({ hasHandle, isCover, tabKey, theme, isDaylight, header, dock, children, layoutRef, onLayoutUpdate }) => {
     const reduced = useKitReducedMotion();
+    const dockHeight = isNativeIOS() ? 48 : DOCK_HEIGHT_PX;
+    const canvasHeight = isNativeIOS() ? 'var(--ios-content-height)' : '100dvh';
     const bottomBarBottomPx = usePlayerBottomBarBottomPx();
     // What is under the surface: the handle, or a small gap. A variable, so the two heights below follow it at once.
     const underPx = hasHandle ? HANDLE_ROOM_PX : BARE_GAP_PX;
     // Never taller than the window allows, wherever the bottom bar's baseline has been lifted to.
     const maxHeight = useTransform(
         bottomBarBottomPx,
-        bottom => `calc(100dvh - var(--pn-under) - ${bottom + TOP_MARGIN_PX}px)`,
+        bottom => `calc(${canvasHeight} - var(--pn-under) - ${bottom + TOP_MARGIN_PX}px)`,
     );
     const headerRoom = useTransform(
         bottomBarBottomPx,
-        bottom => `calc(100dvh - var(--pn-under) - ${bottom + TOP_MARGIN_PX + 2 * PADDING_PX + DOCK_GAP_PX + DOCK_HEIGHT_PX}px)`,
+        bottom => `calc(${canvasHeight} - var(--pn-under) - ${bottom + TOP_MARGIN_PX + 2 * PADDING_PX + DOCK_GAP_PX + dockHeight}px)`,
     );
     const scrollRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -100,6 +104,7 @@ const PanelSurface: React.FC<PanelSurfaceProps> = ({ hasHandle, isCover, tabKey,
             className="ios-player-surface st-window pointer-events-auto @container hide-scrollbar flex w-[360px] max-w-[calc(100vw-2rem)] flex-col overflow-y-auto overflow-x-hidden rounded-[20px] bg-[var(--pn-glass)] text-[color:var(--st-t1)] shadow-[var(--pn-shadow)] backdrop-blur-[40px] backdrop-saturate-[1.3] [&[data-still]_*]:transition-none"
             style={{
                 ...panelTokens(isDaylight, theme, reduced),
+                ...iosGlassTokens(isDaylight, 'controls'),
                 '--pn-under': `${underPx}px`,
                 '--pn-room': headerRoom,
                 // What is left of that room under the song's one line and the hairline: a tab with a
@@ -137,7 +142,7 @@ const PanelSurface: React.FC<PanelSurfaceProps> = ({ hasHandle, isCover, tabKey,
                 </div>
             </div>
 
-            <div className="shrink-0" style={{ height: DOCK_HEIGHT_PX, marginTop: DOCK_GAP_PX }}>
+            <div className="shrink-0" style={{ height: dockHeight, marginTop: DOCK_GAP_PX }}>
                 {dock}
             </div>
         </motion.div>
@@ -152,7 +157,7 @@ const PanelShell: React.FC<PanelShellProps> = ({ isOpen, handle, ...surface }) =
         <motion.div
             style={{ bottom: bottomBarBottomPx }}
             onUpdate={invalidateLayout}
-            className="absolute right-0 z-[60] flex flex-col items-end pointer-events-none"
+            className="ios-panel-positioner absolute right-0 z-[60] flex flex-col items-end pointer-events-none"
             onClick={(e) => e.stopPropagation()}
         >
             <div className="ios-player-panel pr-4 md:pr-8">

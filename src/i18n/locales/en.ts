@@ -1,7 +1,7 @@
 
 
 export default {
-  "ios": {"importAudio": "Import music files", "audioLimit": "iPhone uses native audio for background and lock-screen playback. Desktop crossfade, EQ and ReplayGain are currently unavailable. Manage AirPlay and output volume in Control Center.", "welcome": "The lyrics, colors and music you love. Now with you.", "filesTitle": "Start with your files", "filesBody": "Import music into your local library. Files stay on your iPhone and play offline.", "playbackTitle": "Keep the music going", "playbackBody": "Background audio and lock-screen controls, with native queue advancement for local and Navidrome music.", "lyricsTitle": "Lyrics in motion", "lyricsBody": "Original lyric animations, themes and settings. Online providers require configured endpoints; desktop-only audio effects are unavailable."},
+  "ios": { "seek": "Playback position","importAudio": "Import music files", "audioLimit": "iPhone uses native audio for background and lock-screen playback. Desktop crossfade, EQ and ReplayGain are currently unavailable. Manage AirPlay and output volume in Control Center.", "welcome": "The lyrics, colors and music you love. Now with you.", "filesTitle": "Start with your files", "filesBody": "Import music into your local library. Files stay on your iPhone and play offline.", "playbackTitle": "Keep the music going", "playbackBody": "Background audio and lock-screen controls, with native queue advancement for local and Navidrome music.", "lyricsTitle": "Lyrics in motion", "lyricsBody": "Original lyric animations, themes and settings. Online providers require configured endpoints; desktop-only audio effects are unavailable."},
   "libraryBravais": {
     "suiteName": "Bravais wall",
     "homeTitle": "Library",

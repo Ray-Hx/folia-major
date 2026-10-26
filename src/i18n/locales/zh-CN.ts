@@ -1,7 +1,7 @@
 
 
 export default {
-  "ios": {"importAudio": "导入音乐文件", "audioLimit": "iPhone 使用原生音频引擎支持后台与锁屏播放。暂不支持桌面端的交叉淡化、均衡器和 ReplayGain；AirPlay 与输出音量可在控制中心调整。", "welcome": "熟悉的歌词、色彩与旋律，随身携带。", "filesTitle": "从文件开始", "filesBody": "在本地曲库导入音乐文件。歌曲会保存在 iPhone 中，离线也能播放。", "playbackTitle": "音乐继续播放", "playbackBody": "支持后台播放与锁屏控制。本地音乐和 Navidrome 队列可在后台自动切歌。", "lyricsTitle": "让歌词动起来", "lyricsBody": "保留原有歌词动画、主题和设置。在线平台需配置服务地址；桌面专属音效暂不可用。"},
+  "ios": { "seek": "播放进度","importAudio": "导入音乐文件", "audioLimit": "iPhone 使用原生音频引擎支持后台与锁屏播放。暂不支持桌面端的交叉淡化、均衡器和 ReplayGain；AirPlay 与输出音量可在控制中心调整。", "welcome": "熟悉的歌词、色彩与旋律，随身携带。", "filesTitle": "从文件开始", "filesBody": "在本地曲库导入音乐文件。歌曲会保存在 iPhone 中，离线也能播放。", "playbackTitle": "音乐继续播放", "playbackBody": "支持后台播放与锁屏控制。本地音乐和 Navidrome 队列可在后台自动切歌。", "lyricsTitle": "让歌词动起来", "lyricsBody": "保留原有歌词动画、主题和设置。在线平台需配置服务地址；桌面专属音效暂不可用。"},
   "libraryBravais": {
     "suiteName": "Bravais 墙面",
     "homeTitle": "书库",

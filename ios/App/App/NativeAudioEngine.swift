@@ -9,6 +9,8 @@ final class NativeAudioEngine {
     private var source = ""
     private var tracks: [[String: String]] = []
     private var loop = "off"
+    private var itemStatusObservation: NSKeyValueObservation?
+    private var itemDurationObservation: NSKeyValueObservation?
     private var observation: NSKeyValueObservation?
     private var timeObservation: Any?
     private var tokens: [NSObjectProtocol] = []
@@ -86,7 +88,17 @@ final class NativeAudioEngine {
         let resolved = try NativeLibrary.resolveAudioURL(nativeURL ?? url)
         source = url
         lastEvent = "state"
-        player.replaceCurrentItem(with: AVPlayerItem(url: resolved))
+        let item = AVPlayerItem(url: resolved)
+        // A paused/restored item may become ready without a playback-clock tick.
+        let ready: () -> Void = { [weak self, weak item] in
+            DispatchQueue.main.async {
+                guard let self, let item, self.player.currentItem === item else { return }
+                self.publish(event: item.status == .failed ? "error" : "loaded")
+            }
+        }
+        itemStatusObservation = item.observe(\.status, options: [.new]) { _, _ in ready() }
+        itemDurationObservation = item.observe(\.duration, options: [.new]) { _, _ in ready() }
+        player.replaceCurrentItem(with: item)
         publish(event: "loaded")
     }
 

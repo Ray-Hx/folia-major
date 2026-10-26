@@ -1,3 +1,4 @@
+import { isNativeIOS } from '../../../services/ios/native';
 import React from 'react';
 import { Blend, SlidersHorizontal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -43,6 +44,8 @@ const SoundTiles: React.FC<SoundTilesProps> = ({ loopMode, onToggleLoop, loopTog
                 kind="toggle"
                 icon={<Blend size={18} />}
                 label={t('ui.automix')}
+                disabled={isNativeIOS()}
+                tip={isNativeIOS() ? t('ios.audioLimit') : undefined}
                 lit={automixEnabled}
                 onClick={() => toggleAutomix(!automixEnabled)}
             />
@@ -50,6 +53,8 @@ const SoundTiles: React.FC<SoundTilesProps> = ({ loopMode, onToggleLoop, loopTog
                 kind="open"
                 icon={<SlidersHorizontal size={18} />}
                 label={t('ui.equalizerTitle')}
+                disabled={isNativeIOS()}
+                tip={isNativeIOS() ? t('ios.audioLimit') : undefined}
                 lit={isEqualizerOn}
                 data-ponder="audio-equalizer"
                 onClick={openAudioEqualizer}

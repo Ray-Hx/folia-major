@@ -7,14 +7,40 @@ public class FoliaNativePlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "FoliaNativePlugin"
     public let jsName = "FoliaNative"
     public let pluginMethods: [CAPPluginMethod] = [
-        "writeAudioChunk", "load", "play", "pause", "seek", "setVolume", "setQueue", "getState", "importDocuments", "getDocument"
+        "setChrome", "writeAudioChunk", "load", "play", "pause", "seek", "setVolume", "setQueue", "getState", "importDocuments", "getDocument"
     ].map { CAPPluginMethod(name: $0, returnType: CAPPluginReturnPromise) }
     private let engine = NativeAudioEngine()
     private let library = NativeLibrary()
+    private var chrome: NativePlayerChrome?
 
     public override func load() {
         NativeLibrary.pruneAudioCache()
-        engine.onState = { [weak self] value in self?.notifyListeners("state", data: value) }
+        engine.onState = { [weak self] value in
+            self?.notifyListeners("state", data: value)
+            if Thread.isMainThread { self?.chrome?.update(value) }
+            else { DispatchQueue.main.async { [weak self] in self?.chrome?.update(value) } }
+        }
+    }
+    @objc func setChrome(_ call: CAPPluginCall) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let controller = self.bridge?.viewController else { call.reject("No native host"); return }
+            if self.chrome == nil {
+                let chrome = NativePlayerChrome()
+                chrome.attach(to: controller.parent?.view ?? controller.view)
+                chrome.onSeek = { [weak self] position in self?.engine.seek(position) }
+                chrome.onAction = { [weak self] action in
+                    guard let self else { return }
+                    if action == "toggle" {
+                        if self.engine.snapshot()["playing"] as? Bool == true { self.engine.pause() }
+                        else { try? self.engine.play() }
+                    } else { self.notifyListeners("chromeAction", data: ["action": action]) }
+                }
+                self.chrome = chrome
+            }
+            self.chrome?.present(["shown": call.getBool("shown") ?? false, "light": call.getBool("light") ?? false, "labels": call.getObject("labels") ?? [:]])
+            self.chrome?.update(self.engine.snapshot())
+            call.resolve()
+        }
     }
     private func onMain(_ call: CAPPluginCall, _ action: @escaping () throws -> Void) {
         DispatchQueue.main.async {

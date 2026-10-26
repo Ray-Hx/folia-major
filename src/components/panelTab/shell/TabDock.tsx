@@ -29,7 +29,7 @@ export const TabDock = <T extends string>({ tabs, currentTab, onTabChange }: Tab
     const showNames = names.width <= row.width + 1;
 
     return (
-        <div ref={rowRef} className="relative h-full">
+        <div ref={rowRef} className="ios-panel-dock relative h-full">
             <Segments
                 size="l"
                 fill

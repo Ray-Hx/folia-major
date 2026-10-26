@@ -25,6 +25,8 @@ export interface ImportedDocument {
     uri: string;
 }
 interface FoliaNativePlugin {
+    setChrome(options: { shown: boolean; light: boolean; labels: Record<string, string> }): Promise<void>;
+    addListener(name: 'chromeAction', callback: (state: { action: string }) => void): Promise<PluginListenerHandle>;
     load(options: { url: string; nativeURL?: string }): Promise<NativeAudioState>;
     writeAudioChunk(options: { path: string; data: string; append: boolean }): Promise<void>;
     play(): Promise<void>;

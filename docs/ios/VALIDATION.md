@@ -38,7 +38,7 @@ The native runner's full log is in ignored `ios/output/native-tests.log`. XCTest
 - [Landscape home](screenshots/iphone16pro-home-landscape.png)
 - [Landscape collection](screenshots/iphone16pro-collection-landscape.png)
 
-Delivery artifact: ignored `ios/output/Folia-iPhone16Pro.ipa`, 11,565,688 bytes. Build 3 uses the full-display layout and direct NetEase QR transport. The old `Folia.ipa` in the output directory predates these fixes.
+Delivery artifact: ignored `ios/output/Folia-iPhone16Pro.ipa`, now build 4 (11,581,167 bytes). Build 3 introduced the full-display layout and direct NetEase QR transport; build 4 adds the changes below. The old `Folia.ipa` in the output directory predates these fixes.
 
 ## Follow-up: QR authorization rejected as an abnormal environment
 
@@ -49,3 +49,15 @@ The iOS QR URL omitted the web `chainId` added by the upstream's fix for the sam
 Seven direct-transport tests now cover the chain ID, session continuity, waiting state, authenticated-cookie handling, sign-out isolation and catalogue routing. All 97 targeted regression tests and type checking passed. Successful account-owner authorization remains unverified until the new QR is scanned; this change is not a guarantee that NetEase will accept the client.
 
 Build 3 release export passed strict/deep code-signature verification, and the exact exported app was installed and launched on the connected iPhone 16 Pro. A screenshot of the running simulator app's QR was decoded with Vision: its destination was the official HTTPS music.163.com endpoint and it contained both `codekey` and the web `chainId`. The QR/session identifiers and cookies are not included in this record or committed screenshots.
+
+## Build 4: immersive lyrics, panel layout and clear glass
+
+- TypeScript, production resource build/sync and simulator compilation passed.
+- 126 unit tests across 11 files passed, including existing playback/source/login contracts and bottom-bar/subtitle layout.
+- Nine WebKit cases passed: six display sizes, all 15 lyric renderers at 402 × 874 and 874 × 402, actual classic lyric text, full-viewport lyric bounds, control-panel dock/body separation and background-tap immersion. Tests mock the native bridge; they do not establish UIKit material behavior.
+- Eleven hosted XCTest cases passed. Real UIKit tests verify the Liquid Glass effect type, transport actions/seek and visibility; actual WebView/lyric bounds fill portrait and landscape viewports. Real AVPlayer tests also verify paused-item duration publication. Existing background queue and file bridge tests remain passing.
+- Manual iPhone 16 Pro simulator inspection confirms Clear Liquid Glass transport, full-display scene, separated panel components, and transparent settings with a slightly denser tint. Settings and advanced panels remain Folia React glass styling, not native UIGlassEffect.
+- Evidence: [clear native player](screenshots/iphone16pro-clear-player.png), [advanced controls](screenshots/iphone16pro-clear-controls.png), [settings](screenshots/iphone16pro-clear-settings.png). The song in these native screenshots has no lyric fixture; actual lyric text is covered by WebKit rendering tests.
+- iOS 17–25 material fallback is guarded by availability but has not been visually checked on those OS versions. Hardware AirPlay and sustained animation performance remain unverified. Authentication limitations above remain applicable.
+
+Build 4 release archive/export and strict/deep signature verification passed. The exact exported app was installed and launched on the connected iPhone 16 Pro. SHA-256 of the delivery IPA: `c879815a5d0cea1f9c731ea3c7f220affbba8f2e97232a681ef816732209397a`. Development provisioning expiry remains as documented above. Physical installation/launch is verified; manual visual inspection described above was on the simulator.

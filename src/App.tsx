@@ -1,3 +1,4 @@
+import { useIOSChrome } from './components/ios/useIOSChrome';
 import { useIOSPlayback } from './components/ios/useIOSPlayback';
 import { PlatformAudio } from './components/ios/PlatformAudio';
 import { isNativeIOS } from './services/ios/native';
@@ -1129,6 +1130,7 @@ export default function App() {
     }, [getLocalStemBytes]);
 
     useIOSPlayback(localSongs, playSong);
+    useIOSChrome(() => { void handleNextTrack(); }, () => { void handlePrevTrack(); }, navigateToPlayer);
 
     const automix = useAutomixDecks({
         audioRef,

@@ -64,7 +64,7 @@ const VolumeRow: React.FC<VolumeRowProps> = ({
     const percent = `${Math.round(sliderVolume * 100)}%`;
 
     return (
-        <div className="flex h-10 items-center gap-2">
+        <div className="ios-panel-volume flex h-10 items-center gap-2">
             <PanelIconButton
                 label={t('ui.volume')}
                 onClick={(event) => {

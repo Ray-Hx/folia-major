@@ -61,3 +61,7 @@ FOLIA_SIMULATOR_ID=YOUR_IPHONE_SIMULATOR_UUID npm run test:ios:native
 ```
 
 The native runner backgrounds the simulator test host using Settings. It operates on generated test audio, not your music. See the validation record for device-only checks that remain.
+
+## Immersive playback and clear materials (build 4)
+
+The lyric scene fills the display; only interactive chrome respects safe areas. Tap player background to hide or restore transport controls. iOS 26+ uses a native UIKit `UIGlassEffect(style: .clear)` transport; earlier systems use ultra-thin system material. Advanced controls and settings retain Folia React panels with translucent backgrounds and blur (12% control tint, 22% settings tint). These panels are not UIKit Liquid Glass. Reduced-transparency preferences use a more opaque fallback. Native and web transport controls no longer overlap; panel volume rows and tab touch areas have consistent sizes.

@@ -3,6 +3,7 @@ html[data-native-ios] {
     -webkit-text-size-adjust: 100%;
     overscroll-behavior: none;
     --ios-visible-height: 100dvh;
+    --ios-content-height: calc(var(--ios-visible-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
 }
 html[data-native-ios] body, html[data-native-ios] #root {
     margin: 0;
@@ -46,7 +47,7 @@ html[data-native-ios] .ios-settings-window {
 }
 @media (max-width: 430px) {
     html[data-native-ios] .ios-player-panel { padding-right: 8px; }
-    html[data-native-ios] .ios-player-surface { width: calc(100vw - 16px); }
+    html[data-native-ios] .ios-player-surface { width: calc(100vw - 32px); }
     html[data-native-ios] .ios-player-bar { padding-inline: 8px; }
 }
 @media (orientation: landscape) and (max-height: 500px) {
@@ -93,12 +94,9 @@ html[data-native-ios] .ios-safe-content {
     flex-direction: column;
 }
 html[data-native-ios] [data-testid="player-visual-surface"] { position: fixed; inset: 0; }
-html[data-native-ios] [data-visualizer-style] {
-    top: env(safe-area-inset-top);
-    right: env(safe-area-inset-right);
-    bottom: env(safe-area-inset-bottom);
-    left: env(safe-area-inset-left);
-}
+/* The complete lyric scene is immersive; its buttons handle safe areas separately. */
+html[data-native-ios] [data-visualizer-style] { inset: 0; }
+html[data-native-ios] [data-visualizer-style] [data-ios-visualizer-back] { margin-top: env(safe-area-inset-top); }
 html[data-native-ios] .ios-settings-overlay {
     padding: calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 8px) calc(env(safe-area-inset-bottom) + 8px) calc(env(safe-area-inset-left) + 8px);
 }
@@ -175,4 +173,35 @@ html[data-native-ios] .ios-home-root { padding-bottom: 0; }
     html[data-native-ios] .ios-collection-grid button > p { grid-column: 2; margin: 0; }
     html[data-native-ios] .ios-collection-grid button > p:first-of-type { align-self: end; }
     html[data-native-ios] .ios-collection-grid button > p:last-of-type { align-self: start; }
+}
+
+/* Compact visual components keep their own 32/36px geometry. Enlarge the owning rows, not just their children. */
+html[data-native-ios] .ios-player-surface button { min-width: 0; min-height: 0; }
+html[data-native-ios] .ios-panel-dock { min-height: 48px; }
+html[data-native-ios] .ios-panel-dock [role="group"] { height: 48px; }
+html[data-native-ios] .ios-panel-dock button { min-height: 44px; }
+html[data-native-ios] .ios-panel-volume { height: 44px; }
+html[data-native-ios] .ios-panel-volume button { min-height: 44px; min-width: 44px; }
+html[data-native-ios] .ios-panel-volume [role="slider"] { min-height: 32px; }
+
+html[data-native-ios] .ios-player-surface [role="group"]:not([aria-labelledby]) { min-height: 44px; }
+
+/* The account entry and old panel handle cannot share the native transport's hit area. */
+html[data-native-ios][data-ios-transport-shown="true"] .ios-account-pill { bottom: 120px !important; }
+html[data-native-ios][data-ios-transport-shown="true"] .ios-panel-positioner { visibility: hidden; }
+@media (orientation: landscape) and (max-height: 500px) {
+    html[data-native-ios][data-ios-transport-shown="true"] .ios-account-pill { bottom: 88px !important; }
+}
+
+html[data-native-ios] .ios-settings-window {
+    backdrop-filter: blur(28px) saturate(1.3);
+    -webkit-backdrop-filter: blur(28px) saturate(1.3);
+}
+html[data-native-ios] .ios-player-surface {
+    backdrop-filter: blur(20px) saturate(1.2);
+    -webkit-backdrop-filter: blur(20px) saturate(1.2);
+}
+@media (prefers-reduced-transparency: reduce) {
+    html[data-native-ios] .ios-settings-window,
+    html[data-native-ios] .ios-player-surface { background-color: var(--bg-color, #18181b); }
 }

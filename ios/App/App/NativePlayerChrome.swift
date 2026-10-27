@@ -30,9 +30,14 @@ final class NativePlayerChrome: UIVisualEffectView {
         } else { material = UIBlurEffect(style: .systemUltraThinMaterial) }
         super.init(effect: material)
         accessibilityIdentifier = "folia-native-transport"
-        layer.cornerRadius = 28
-        layer.cornerCurve = .continuous
+        if #available(iOS 26.0, *) {
+            cornerConfiguration = .capsule(maximumRadius: 28)
+        } else {
+            layer.cornerRadius = 28
+            layer.cornerCurve = .continuous
+        }
         clipsToBounds = true
+        tintColor = .label
         title.font = .preferredFont(forTextStyle: .subheadline)
         title.adjustsFontForContentSizeCategory = true
         title.lineBreakMode = .byTruncatingTail
@@ -56,6 +61,7 @@ final class NativePlayerChrome: UIVisualEffectView {
         configure(nextButton, symbol: "forward.end.fill", action: "next")
         configure(more, symbol: "slider.horizontal.3", action: "panel")
         let route = AVRoutePickerView(); route.accessibilityIdentifier = "folia-route-picker"
+        route.tintColor = .label
         [previous, play, nextButton, more, route].forEach(row.addArrangedSubview)
         row.heightAnchor.constraint(equalToConstant: 44).isActive = true
         stack.axis = .vertical; stack.spacing = 4

@@ -262,11 +262,17 @@ final class NativePlaybackTests: XCTestCase {
         XCTAssertFalse(chrome.isHidden)
         XCTAssertGreaterThan(chrome.bounds.width, 300)
         XCTAssertLessThanOrEqual(chrome.frame.maxY, window.safeAreaLayoutGuide.layoutFrame.maxY)
-        if #available(iOS 26.0, *) { XCTAssertTrue(chrome.effect is UIGlassEffect) }
+        if #available(iOS 26.0, *) {
+            let glass = try XCTUnwrap(chrome.effect as? UIGlassEffect)
+            XCTAssertTrue(glass.isInteractive)
+            XCTAssertNil(glass.tintColor)
+            XCTAssertEqual(chrome.cornerConfiguration, .capsule(maximumRadius: 28))
+        }
         else { XCTAssertTrue(chrome.effect is UIBlurEffect) }
         func descendants(_ view: UIView) -> [UIView] { view.subviews.flatMap { [$0] + descendants($0) } }
         let children = descendants(chrome)
         let play = children.first { $0.accessibilityIdentifier == "folia-native-toggle" } as! UIButton
+        XCTAssertEqual(play.tintColor, .label)
         XCTAssertEqual(play.accessibilityLabel, "Play")
         var action = ""
         chrome.onAction = { action = $0 }

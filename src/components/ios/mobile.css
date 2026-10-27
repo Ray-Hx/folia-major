@@ -205,3 +205,29 @@ html[data-native-ios] .ios-player-surface {
     html[data-native-ios] .ios-settings-window,
     html[data-native-ios] .ios-player-surface { background-color: var(--bg-color, #18181b); }
 }
+
+/* Bravais paints the entire display; the info strip, its lists and the buttons remain inside the
+   safe rectangle. Posters are the exception: their artwork keeps its bleed, only their UI is inset. */
+html[data-native-ios] .bravais-root { position: fixed; inset: 0; }
+html[data-native-ios] .bravais-root:not([data-bravais-seam-axis="y"])
+    > .bravais-seam:not([data-bravais-seam="poster"])
+    > .bravais-seam-content {
+    top: env(safe-area-inset-top);
+    bottom: env(safe-area-inset-bottom);
+}
+html[data-native-ios] .bravais-root[data-bravais-seam-axis="y"] > .bravais-seam > .bravais-seam-content {
+    left: env(safe-area-inset-left);
+    right: env(safe-area-inset-right);
+}
+html[data-native-ios] .bravais-root .bravais-seam[data-bravais-seam="poster"] .bravais-poster-ui {
+    padding-top: env(safe-area-inset-top);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+}
+html[data-native-ios] .bravais-root .lattice-back {
+    top: calc(env(safe-area-inset-top) + 20px);
+    left: calc(env(safe-area-inset-left) + 24px);
+}
+html[data-native-ios] .bravais-root .bravais-seam-tab[data-side="left"] { left: env(safe-area-inset-left); }
+html[data-native-ios] .bravais-root .bravais-seam-tab[data-side="right"] { right: env(safe-area-inset-right); }

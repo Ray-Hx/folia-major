@@ -1460,6 +1460,8 @@ export default {
     "songs": "songs",
     "loginTitle": "Scan with Netease App",
     "loginNote": "Open Netease Music App > Discover > Scan QR",
+    "loginTitleWeb": "Sign in to NetEase",
+    "loginNoteWeb": "Sign in with your phone number and SMS code in this app",
     "loginTitleKugou": "Scan with KuGou Music",
     "loginNoteKugou": "Open KuGou Music and scan this QR code",
     "loginTitleQq": "Scan to sign in to QQ Music",

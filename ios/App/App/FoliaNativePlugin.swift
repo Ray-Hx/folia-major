@@ -7,7 +7,7 @@ public class FoliaNativePlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "FoliaNativePlugin"
     public let jsName = "FoliaNative"
     public let pluginMethods: [CAPPluginMethod] = [
-        "setChrome", "writeAudioChunk", "load", "play", "pause", "seek", "setVolume", "setQueue", "getState", "importDocuments", "getDocument"
+        "setChrome", "writeAudioChunk", "load", "play", "pause", "seek", "setVolume", "setQueue", "getState", "importDocuments", "getDocument", "neteaseWebLogin"
     ].map { CAPPluginMethod(name: $0, returnType: CAPPluginReturnPromise) }
     private let engine = NativeAudioEngine()
     private let library = NativeLibrary()
@@ -76,6 +76,26 @@ public class FoliaNativePlugin: CAPPlugin, CAPBridgedPlugin {
         do { call.resolve(["uri": try NativeLibrary.file(call.getString("path") ?? "").absoluteString]) }
         catch { call.reject(error.localizedDescription) }
     }
+    @objc func neteaseWebLogin(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard let controller = self.bridge?.viewController else {
+                call.reject("No native host")
+                return
+            }
+            let login = NeteaseWebLoginController()
+            login.onFinish = { cookie in
+                if let cookie, !cookie.isEmpty {
+                    call.resolve(["cookie": cookie])
+                } else {
+                    call.resolve(["cancelled": true])
+                }
+            }
+            let navigation = UINavigationController(rootViewController: login)
+            navigation.modalPresentationStyle = .fullScreen
+            controller.present(navigation, animated: true)
+        }
+    }
+
     @objc func importDocuments(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
             guard self.library.completion == nil, let controller = self.bridge?.viewController else {

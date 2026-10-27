@@ -752,7 +752,10 @@ export const neteaseApi = {
   },
 
   createQr: async (key: string) => {
-    return fetchWithCreds(`/login/qr/create?key=${key}&qrimg=true${isNativeIOS() ? '&platform=web' : ''}`, {}, 'sign-in');
+    // The desktop backend calls the upstream login_qr_create without `platform`, so the QR is the
+    // PC login URL. `platform=web` adds a chainId and sends the scan to NetEase's web login page,
+    // which rejects this client as an abnormal device environment.
+    return fetchWithCreds(`/login/qr/create?key=${key}&qrimg=true`, {}, 'sign-in');
   },
 
   checkQr: async (key: string) => {

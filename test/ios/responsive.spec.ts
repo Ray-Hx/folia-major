@@ -60,6 +60,31 @@ for (const size of sizes) {
         await assertInside(page, '.ios-settings-window');
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
         expect(overflow).toBe(false);
+        if (size.name === 'iPhone16Pro') {
+            await page.evaluate(async () => {
+                const load = (path: string) => import(/* @vite-ignore */ path);
+                const [{ useSettingsModalStore }, { chooseLibrarySuite }] = await Promise.all([
+                    load('/src/stores/useSettingsModalStore.ts'), load('/src/library/app/librarySuiteChoice.ts'),
+                ]);
+                useSettingsModalStore.getState().closeSettings();
+                chooseLibrarySuite('bravais');
+            });
+            const wall = page.locator('[data-library-stage="bravais"]');
+            await expect(wall).toBeVisible({ timeout: 30000 });
+            for (const frame of [
+                { width: 402, height: 874, inset: '62px 0px 34px' },
+                { width: 874, height: 402, inset: '20px 62px' },
+            ]) {
+                await page.setViewportSize(frame);
+                // WebKit automation has no device notch; emulate the native safe content rectangle.
+                await page.locator('.ios-safe-content').evaluate((node, inset) => { (node as HTMLElement).style.inset = inset; }, frame.inset);
+                await expect.poll(async () => {
+                    const r = await wall.boundingBox();
+                    return r && [r.x, r.y, r.width, r.height].map(Math.round);
+                }).toEqual([0, 0, frame.width, frame.height]);
+                await page.screenshot({ path: `test-results/ios/library-wall-${frame.width}.png` });
+            }
+        }
         expect(errors).toEqual([]);
     });
 }

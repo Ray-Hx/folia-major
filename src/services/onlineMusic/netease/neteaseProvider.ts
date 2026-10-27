@@ -170,6 +170,36 @@ const throwIfLoginCheckRefused = (response: any, route: string): void => {
     throw neteaseAnswerError(response, route);
 };
 
+// The signed-in account read shared by the normal status check, the QR confirmation poll and
+// the iOS web sign-in poll. Null means NetEase explicitly says nobody is signed in.
+const readNeteaseSignedInUser = async (): Promise<ProviderUser | null> => {
+    cookieAskedWith = readProviderSessionValue('netease', 'cookie', ['netease_cookie']);
+    const loginResponse = await neteaseApi.getLoginStatus();
+    throwIfLoginCheckRefused(loginResponse, 'login/status');
+    const loginProfile = loginResponse?.data?.profile;
+    const loginCode = Number(loginResponse?.code ?? loginResponse?.data?.code);
+    if (!loginProfile || [301, 401, 403].includes(loginCode)) {
+        noteLoginStatusCheck(diagnosticLine`login/status code=${loginCode} profile=${yesNo(Boolean(loginProfile))}`);
+        return null;
+    }
+
+    const accountResponse = await neteaseApi.getUserAccount();
+    throwIfLoginCheckRefused(accountResponse, 'user/account');
+    const accountCode = Number(accountResponse?.code ?? accountResponse?.data?.code);
+    const accountProfile = accountResponse?.profile;
+    const accountId = accountResponse?.account?.id ?? accountProfile?.userId;
+    const loginId = loginProfile?.userId ?? loginProfile?.id;
+    if (!accountProfile || [301, 401, 403].includes(accountCode) || !accountId || !loginId || String(accountId) !== String(loginId)) {
+        noteLoginStatusCheck(diagnosticLine`user/account code=${accountCode} profile=${yesNo(Boolean(accountProfile))} same-user=${yesNo(Boolean(accountId && loginId && String(accountId) === String(loginId)))}`);
+        return null;
+    }
+
+    // 这里不写 cookie：登录状态的回答不带 cookie（上游 login_status 的回答正文里没有），真带了也只会是
+    // 那一次请求的 Set-Cookie，可能没有 MUSIC_U，会盖掉扫码时存下的登录。cookie 只在扫码确认时写（checkLogin）。
+    noteLoginStatusCheck(diagnosticLine`signed in (login/status code=${loginCode}, user/account code=${accountCode})`);
+    return normalizeUser({ ...loginProfile, ...accountProfile });
+};
+
 const extractCloudLyricText = (response: any): string => (
     response?.lrc || response?.data?.lrc || response?.lyric || response?.data?.lyric || ''
 );
@@ -442,31 +472,7 @@ export const neteaseProvider: OnlineMusicProvider = {
         getLoginTexts: () => ({ title: 'home.loginTitle', note: 'home.loginNote' }),
         localService: neteaseLocalService,
         async getLoginStatus() {
-            cookieAskedWith = readProviderSessionValue('netease', 'cookie', ['netease_cookie']);
-            const loginResponse = await neteaseApi.getLoginStatus();
-            throwIfLoginCheckRefused(loginResponse, 'login/status');
-            const loginProfile = loginResponse?.data?.profile;
-            const loginCode = Number(loginResponse?.code ?? loginResponse?.data?.code);
-            if (!loginProfile || [301, 401, 403].includes(loginCode)) {
-                noteLoginStatusCheck(diagnosticLine`login/status code=${loginCode} profile=${yesNo(Boolean(loginProfile))}`);
-                return null;
-            }
-
-            const accountResponse = await neteaseApi.getUserAccount();
-            throwIfLoginCheckRefused(accountResponse, 'user/account');
-            const accountCode = Number(accountResponse?.code ?? accountResponse?.data?.code);
-            const accountProfile = accountResponse?.profile;
-            const accountId = accountResponse?.account?.id ?? accountProfile?.userId;
-            const loginId = loginProfile?.userId ?? loginProfile?.id;
-            if (!accountProfile || [301, 401, 403].includes(accountCode) || !accountId || !loginId || String(accountId) !== String(loginId)) {
-                noteLoginStatusCheck(diagnosticLine`user/account code=${accountCode} profile=${yesNo(Boolean(accountProfile))} same-user=${yesNo(Boolean(accountId && loginId && String(accountId) === String(loginId)))}`);
-                return null;
-            }
-
-            // 这里不写 cookie：登录状态的回答不带 cookie（上游 login_status 的回答正文里没有），真带了也只会是
-            // 那一次请求的 Set-Cookie，可能没有 MUSIC_U，会盖掉扫码时存下的登录。cookie 只在扫码确认时写（checkLogin）。
-            noteLoginStatusCheck(diagnosticLine`signed in (login/status code=${loginCode}, user/account code=${accountCode})`);
-            return normalizeUser({ ...loginProfile, ...accountProfile });
+            return readNeteaseSignedInUser();
         },
         // The request to NetEase takes the cookie as it is when it is made (`neteaseApi.logout`),
         // and the cookie goes at once, before the first wait and whatever NetEase answers: what

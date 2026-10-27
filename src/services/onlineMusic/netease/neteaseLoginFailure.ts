@@ -14,6 +14,10 @@ export const describeNeteaseLoginFailure = (_step: LoginStep, error: unknown): L
     if (isNeteaseNetworkFailure(error) || error instanceof TypeError) return { case: 'unreachable' };
     // 本地后端回了 HTTP 错误：它的状态（连不上网易云时是 502），和回答里网易云的码和原话。
     if (error instanceof NeteaseLoginHttpError) return { httpStatus: error.httpStatus, ...neteaseCheckFailure(error.answer) };
+    if (error instanceof Error && 'httpStatus' in error && typeof error.httpStatus === 'number') {
+        const answer = 'answer' in error ? error.answer : undefined;
+        return { httpStatus: error.httpStatus, ...neteaseCheckFailure(answer) };
+    }
     return null;
 };
 

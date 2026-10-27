@@ -77,6 +77,51 @@ final class NativePlaybackTests: XCTestCase {
             XCTAssertEqual(lyricFrame[1], 0, accuracy: 1)
             XCTAssertEqual(lyricFrame[2], window.bounds.width, accuracy: 1)
             XCTAssertEqual(lyricFrame[3], window.bounds.height, accuracy: 1)
+            // Exercise the iOS library canvas CSS inside the real safe-area parent. The browser
+            // suite separately mounts the actual Bravais stage and its camera/controls.
+            // The wall and posters paint the complete display; the info strip, its lists, the seam
+            // tab and the poster UI stay inside the safe rectangle.
+            let libraryFrame = try await web.evaluateJavaScript("""
+                (() => {
+                    const host = document.querySelector('.ios-safe-content');
+                    const wall = document.createElement('section'); wall.className = 'bravais-root';
+                    const seam = document.createElement('div'); seam.className = 'bravais-seam';
+                    seam.style.cssText = 'position:absolute;inset:0';
+                    const content = document.createElement('div'); content.className = 'bravais-seam-content';
+                    content.style.position = 'absolute'; seam.append(content);
+                    const tab = document.createElement('button'); tab.className = 'bravais-seam-tab';
+                    tab.dataset.side = 'left';
+                    wall.append(seam, tab); host.append(wall);
+                    const r = wall.getBoundingClientRect(), c = content.getBoundingClientRect();
+                    const tabLeft = parseFloat(getComputedStyle(tab).left);
+                    const posterSeam = document.createElement('div'); posterSeam.className = 'bravais-seam';
+                    posterSeam.dataset.bravaisSeam = 'poster';
+                    // The wall's lazy chunk owns the real bleed rules; this stand-in keeps the same
+                    // 40vh offsets so the always-loaded iOS rules can be checked without that chunk.
+                    posterSeam.style.cssText = 'position:absolute;left:0;right:0;top:calc(-1 * 40vh);bottom:calc(-1 * 40vh)';
+                    const posterContent = document.createElement('div'); posterContent.className = 'bravais-seam-content';
+                    posterContent.style.cssText = 'position:absolute;left:0;right:0;top:40vh;bottom:40vh';
+                    const posterUi = document.createElement('div'); posterUi.className = 'bravais-poster-ui';
+                    posterContent.append(posterUi); posterSeam.append(posterContent); wall.append(posterSeam);
+                    const p = posterContent.getBoundingClientRect();
+                    const ui = getComputedStyle(posterUi);
+                    const result = [r.x, r.y, r.width, r.height, c.y, c.height, tabLeft,
+                        p.y, p.height, parseFloat(ui.paddingTop), parseFloat(ui.paddingBottom)];
+                    wall.remove(); return result;
+                })()
+                """) as! [Double]
+            XCTAssertEqual(libraryFrame[0], 0, accuracy: 1)
+            XCTAssertEqual(libraryFrame[1], 0, accuracy: 1)
+            XCTAssertEqual(libraryFrame[2], window.bounds.width, accuracy: 1)
+            XCTAssertEqual(libraryFrame[3], window.bounds.height, accuracy: 1)
+            XCTAssertEqual(libraryFrame[4], safe.minY, accuracy: 1)
+            XCTAssertEqual(libraryFrame[5], safe.height, accuracy: 1)
+            XCTAssertEqual(libraryFrame[6], safe.minX, accuracy: 1)
+            // A poster keeps its bleed: it still starts at the display edge, not the safe inset.
+            XCTAssertEqual(libraryFrame[7], 0, accuracy: 1)
+            XCTAssertEqual(libraryFrame[8], window.bounds.height, accuracy: 1)
+            XCTAssertEqual(libraryFrame[9], safe.minY, accuracy: 1)
+            XCTAssertEqual(libraryFrame[10], window.safeAreaInsets.bottom, accuracy: 1)
             let attachment = XCTAttachment(image: UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
                 window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
             })
@@ -85,6 +130,125 @@ final class NativePlaybackTests: XCTestCase {
             add(attachment)
             print("[FoliaNativeTest] Safe canvas \(frame.width)x\(frame.height), insets \(window.safeAreaInsets)")
         }
+
+        // The real library wall: Bravais paints the complete display while its info strip, lists and
+        // buttons stay inside the safe rectangle.
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        _ = try await web.evaluateJavaScript("""
+            (() => {
+                localStorage.setItem('library_suite', 'bravais');
+                localStorage.setItem('library_suite_prompt_seen', 'true');
+                localStorage.setItem('folia_last_seen_ponder_onboarding_version', '\(version)');
+                location.reload();
+            })()
+            """)
+        let libraryFrames = try await waitForBravaisWall(web)
+        XCTAssertEqual(libraryFrames.count, 4)
+        guard libraryFrames.count == 4 else { return }
+        try await waitForBravaisSeam(web)
+        XCTAssertEqual(libraryFrames[0], 0, accuracy: 1)
+        XCTAssertEqual(libraryFrames[1], 0, accuracy: 1)
+        XCTAssertEqual(libraryFrames[2], Double(window.bounds.width), accuracy: 1)
+        XCTAssertEqual(libraryFrames[3], Double(window.bounds.height), accuracy: 1)
+        let safe = window.safeAreaLayoutGuide.layoutFrame
+        let toolsFrame = try await waitForWallTools(web)
+        XCTAssertEqual(toolsFrame.count, 4)
+        if toolsFrame.count == 4 {
+            XCTAssertGreaterThanOrEqual(toolsFrame[0], Double(safe.minX) - 1)
+            XCTAssertGreaterThanOrEqual(toolsFrame[1], Double(safe.minY) - 1)
+            XCTAssertLessThanOrEqual(toolsFrame[0] + toolsFrame[2], Double(safe.maxX) + 1)
+            XCTAssertLessThanOrEqual(toolsFrame[1] + toolsFrame[3], Double(safe.maxY) + 1)
+        }
+        attachScreenshot(window, name: "Bravais-library-portrait")
+
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight))
+        for _ in 0..<50 {
+            if !scene.interfaceOrientation.isPortrait { break }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        try await Task.sleep(nanoseconds: 700_000_000)
+        let landscapeWall = try await waitForBravaisWall(web)
+        XCTAssertEqual(landscapeWall.count, 4)
+        try await waitForBravaisSeam(web)
+        if landscapeWall.count == 4 {
+            XCTAssertEqual(landscapeWall[0], 0, accuracy: 1)
+            XCTAssertEqual(landscapeWall[1], 0, accuracy: 1)
+            XCTAssertEqual(landscapeWall[2], Double(window.bounds.width), accuracy: 1)
+            XCTAssertEqual(landscapeWall[3], Double(window.bounds.height), accuracy: 1)
+        }
+        let landscapeTools = try await waitForWallTools(web)
+        let landscapeSafe = window.safeAreaLayoutGuide.layoutFrame
+        XCTAssertEqual(landscapeTools.count, 4)
+        if landscapeTools.count == 4 {
+            XCTAssertGreaterThanOrEqual(landscapeTools[0], Double(landscapeSafe.minX) - 1)
+            XCTAssertGreaterThanOrEqual(landscapeTools[1], Double(landscapeSafe.minY) - 1)
+            XCTAssertLessThanOrEqual(landscapeTools[0] + landscapeTools[2], Double(landscapeSafe.maxX) + 1)
+            XCTAssertLessThanOrEqual(landscapeTools[1] + landscapeTools[3], Double(landscapeSafe.maxY) + 1)
+        }
+        attachScreenshot(window, name: "Bravais-library-landscape")
+        print("[FoliaNativeTest] Bravais wall \(libraryFrames), tools \(toolsFrame), landscape \(landscapeWall)")
+    }
+
+    /// Waits for the lazily loaded Bravais stage and returns its viewport rect.
+    private func waitForBravaisWall(_ web: WKWebView) async throws -> [Double] {
+        for _ in 0..<150 {
+            let frame = (try? await web.evaluateJavaScript("""
+                (() => {
+                    const wall = document.querySelector('[data-library-stage="bravais"]');
+                    if (!wall) return null;
+                    const r = wall.getBoundingClientRect();
+                    return [r.x, r.y, r.width, r.height];
+                })()
+                """)) as? [Double] ?? []
+            if frame.count == 4, frame[2] > 0 { return frame }
+            try await Task.sleep(nanoseconds: 200_000_000)
+        }
+        return []
+    }
+
+    /// The home info strip, once it has opened (it may still be fading in right after the stage mounts).
+    private func waitForBravaisSeam(_ web: WKWebView) async throws {
+        for _ in 0..<50 {
+            let open = (try? await web.evaluateJavaScript("""
+                (() => {
+                    const seam = document.querySelector('.bravais-seam');
+                    if (!seam) return false;
+                    const r = seam.getBoundingClientRect();
+                    return r.width > 0 && r.height > 0;
+                })()
+                """)) as? Bool ?? false
+            if open {
+                try await Task.sleep(nanoseconds: 500_000_000)
+                return
+            }
+            try await Task.sleep(nanoseconds: 200_000_000)
+        }
+    }
+
+    /// The dock's tools button, once the wall has claimed it.
+    private func waitForWallTools(_ web: WKWebView) async throws -> [Double] {
+        for _ in 0..<50 {
+            let frame = (try? await web.evaluateJavaScript("""
+                (() => {
+                    const tools = document.querySelector('[data-wall-tools-dock] .lattice-tools');
+                    if (!tools) return null;
+                    const r = tools.getBoundingClientRect();
+                    return [r.x, r.y, r.width, r.height];
+                })()
+                """)) as? [Double] ?? []
+            if frame.count == 4, frame[2] > 0 { return frame }
+            try await Task.sleep(nanoseconds: 200_000_000)
+        }
+        return []
+    }
+
+    private func attachScreenshot(_ window: UIWindow, name: String) {
+        let attachment = XCTAttachment(image: UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+            window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+        })
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     func testNativeGlassTransportControlsAndLayout() async throws {

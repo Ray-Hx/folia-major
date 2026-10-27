@@ -1,6 +1,6 @@
 import { readProviderSessionValue, writeProviderSessionValue } from '../providerStorage';
 
-// Keep one installation/session identity across QR creation, polling and foreground requests.
+// Keep one installation/session identity across QR key polling and foreground requests.
 const SESSION_KEY = 'ios_transport_cookies';
 const INSTALLATION_KEY = 'ios_installation_id';
 const AUTH_COOKIES = new Set(['MUSIC_U', 'MUSIC_R_T']);
@@ -34,14 +34,4 @@ export function keepIOSNeteaseCookies(cookies: string[]) {
     Object.assign(saved, parseIOSNeteaseCookies(cookies.join(';')));
     for (const key of AUTH_COOKIES) delete saved[key];
     writeProviderSessionValue('netease', SESSION_KEY, Object.entries(saved).map(([key, value]) => `${key}=${value}`).join('; '));
-}
-
-export function iosNeteaseQRURL(key: string, cookie: string, now = Date.now()) {
-    const deviceId = parseIOSNeteaseCookies(cookie).sDeviceId;
-    if (!deviceId) throw new Error('NetEase QR session has no installation identity');
-    const url = new URL('https://music.163.com/login');
-    url.searchParams.set('codekey', key);
-    // Matches upstream login_qr_create(platform=web) and util/index.generateChainId.
-    url.searchParams.set('chainId', `v1_${deviceId}_web_login_${now}`);
-    return url.toString();
 }

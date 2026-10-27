@@ -84,3 +84,13 @@ TypeScript and production resource build/sync passed. The existing WebKit panel 
 Build 6 signed archive/export and strict/deep signature verification passed. IPA: 11,580,237 bytes; SHA-256 `17d645fdcffe9ed872da7a1ea53f799d9d35bd89d998098727898bdf081836ee`. Provisioning constraints remain unchanged.
 
 The exact exported build 6 app was installed and launched on the connected iPhone 16 Pro. Visual/layout assertions above were performed in WebKit, not claimed as an automated inspection of the physical screen.
+
+## Build 7: align the NetEase QR flow with desktop
+
+The owner reported an abnormal-device block while scanning. The earlier web-chain URL differed from the desktop backend. The PC QR URL now matches the pinned upstream default, without a web chain ID. The iOS direct key and polling calls also use the desktop EAPI host, encrypted request envelope, header and a device identity kept for the current app session; the earlier iOS transport sent plain requests to a different host. HTTP failures retain NetEase's code and message. The upstream check wrapper is replaced for this path because it can swallow failures.
+
+The encrypted request was compared with the pinned upstream implementation. A real direct EAPI request returned a QR key and a subsequent poll returned 801 (waiting). These checks do not establish successful account authorization: the account owner must scan and approve using the NetEase app. Desktop startup additionally registers an anonymous token, which iOS does not yet implement; service-side risk control can still reject the request.
+
+The real iOS simulator app displayed a QR and remained in its waiting state using native HTTP. The account was not scanned or authorized by the test. The request envelope and session behavior passed 95 related unit tests; an additional diagnostic test verifies that HTTP refusal details are retained. No QR key, cookie or credentials are included in this record.
+
+The Bravais library wall also fills the screen in portrait and landscape. A WebKit test exercised the actual stage with simulated safe-area insets, and all 11 native XCTest cases passed, including real safe-area geometry, the library stage and its tools. Build 7 archive/export and strict/deep signature verification passed. The exact exported app was installed and launched on the connected iPhone after one connection reset and retry. IPA SHA-256: `72694bd99157c3110a9b452187163d825a71c6196636a9acf110bfb469df517e`.

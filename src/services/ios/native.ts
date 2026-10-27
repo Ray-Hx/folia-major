@@ -37,6 +37,7 @@ interface FoliaNativePlugin {
     getState(): Promise<NativeAudioState>;
     importDocuments(): Promise<{ files: ImportedDocument[] }>;
     getDocument(options: { path: string }): Promise<{ uri: string }>;
+    neteaseWebLogin(): Promise<{ cookie?: string; cancelled?: boolean }>;
     addListener(name: 'state', callback: (state: NativeAudioState) => void): Promise<PluginListenerHandle>;
 }
 export const FoliaNative = registerPlugin<FoliaNativePlugin>('FoliaNative');

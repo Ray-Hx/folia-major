@@ -1460,6 +1460,8 @@ export default {
     "songs": "lagu",
     "loginTitle": "Pindai dengan Aplikasi Netease",
     "loginNote": "Buka Aplikasi Netease Music > Discover > Pindai QR",
+    "loginTitleWeb": "Masuk ke NetEase",
+    "loginNoteWeb": "Masuk dengan nomor telepon dan kode SMS di aplikasi ini",
     "loginTitleKugou": "Pindai dengan KuGou Music",
     "loginNoteKugou": "Buka KuGou Music dan pindai kode QR ini",
     "loginTitleQq": "Pindai untuk masuk ke QQ Music",

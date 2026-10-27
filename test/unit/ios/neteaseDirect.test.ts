@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CapacitorHttp } from '@capacitor/core';
+import CryptoJS from 'crypto-js';
+import { createRequire } from 'node:module';
 import { requestIOSNetease } from '../../../src/services/onlineMusic/netease/iosNetease';
+import { describeNeteaseLoginFailure } from '../../../src/services/onlineMusic/netease/neteaseLoginFailure';
 
 const sessions = vi.hoisted(() => new Map<string, string>());
-vi.mock('@capacitor/core', () => ({ CapacitorHttp: { post: vi.fn() } }));
+vi.mock('@capacitor/core', async importOriginal => ({ ...await importOriginal<typeof import('@capacitor/core')>(), CapacitorHttp: { post: vi.fn() } }));
 vi.mock('../../../src/services/onlineMusic/providerStorage', () => ({
     readProviderSessionValue: (_provider: string, key: string) => sessions.get(key) ?? '',
     writeProviderSessionValue: (_provider: string, key: string, value: string) => sessions.set(key, value),
@@ -13,24 +16,41 @@ vi.mock('../../../src/services/onlineMusic/providerStorage', () => ({
 const post = vi.mocked(CapacitorHttp.post);
 describe('iOS direct NetEase transport', () => {
     beforeEach(() => { post.mockReset(); sessions.clear(); });
-    it('uses the upstream QR key request and produces a local QR image', async () => {
+    it('uses the upstream QR key request and the desktop PC QR URL', async () => {
         post.mockResolvedValue({status:200, headers:{}, data:{code:200, unikey:'fixture-key'}, url:''});
         expect(await requestIOSNetease('/login/qr/key')).toEqual({code:200, data:{code:200, unikey:'fixture-key'}});
-        expect(post.mock.calls[0][0].url).toBe('https://music.163.com/api/login/qrcode/unikey');
+        const first = post.mock.calls[0][0];
+        expect(first.url).toBe('https://interfacepc.music.163.com/eapi/login/qrcode/unikey');
+        const encrypted = new URLSearchParams(first.data as string).get('params')!;
+        const key = CryptoJS.enc.Utf8.parse('e82ckenh8dichen8');
+        const decrypted = CryptoJS.AES.decrypt({ ciphertext: CryptoJS.enc.Hex.parse(encrypted) } as CryptoJS.lib.CipherParams, key, {
+            mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.Pkcs7,
+        }).toString(CryptoJS.enc.Utf8);
+        const [uri, json] = decrypted.split('-36cd479b6b5-');
+        const payload = JSON.parse(json);
+        expect(uri).toBe('/api/login/qrcode/unikey');
+        expect(payload).toMatchObject({ type: 3, e_r: false, header: { os: 'pc', appver: '3.1.17.204416', channel: 'netease' } });
+        // Compare the actual encrypted body with the pinned upstream implementation.
+        const upstream = createRequire(import.meta.url)('@neteasecloudmusicapienhanced/api/util/crypto');
+        expect(encrypted).toBe(upstream.eapi(uri, payload).params);
         const result = await requestIOSNetease('/login/qr/create?key=fixture-key') as any;
-        expect(result.data.qrurl).toContain('codekey=fixture-key');
-        expect(new URL(result.data.qrurl).searchParams.get('chainId')).toMatch(/^v1_[A-F0-9]{52}_web_login_\d+$/);
+        // The desktop backend reaches the upstream route without `platform`, which returns the PC
+        // URL. A web chainId would put the scan on NetEase's blocked web login page.
+        expect(result.data.qrurl).toBe('https://music.163.com/login?codekey=fixture-key');
+        expect(new URL(result.data.qrurl).searchParams.has('chainId')).toBe(false);
         expect(result.data.qrimg).toMatch(/^data:image\/png;base64,/);
         expect(post).toHaveBeenCalledTimes(1);
     });
-    it('uses the same session cookie from key generation through QR creation and polling', async () => {
+    it('keeps the server session through key generation and polling', async () => {
         post.mockResolvedValueOnce({status:200, headers:{'Set-Cookie':'sDeviceId=server-session; Path=/, NMTID=session-nonce; Path=/'}, data:{code:200, unikey:'key'}, url:''});
         await requestIOSNetease('/login/qr/key');
         const qr = await requestIOSNetease('/login/qr/create?key=key') as any;
-        expect(new URL(qr.data.qrurl).searchParams.get('chainId')).toMatch(/^v1_server-session_web_login_\d+$/);
+        expect(qr.data.qrurl).toBe('https://music.163.com/login?codekey=key');
         post.mockResolvedValueOnce({status:200, headers:{}, data:{code:801}, url:''});
         await requestIOSNetease('/login/qr/check?key=key');
-        expect(post.mock.calls[1][0].headers?.Cookie).toContain('sDeviceId=server-session');
+        const firstDevice = /deviceId=([^;]+)/.exec(String(post.mock.calls[0][0].headers?.Cookie))?.[1];
+        expect(firstDevice).toBeTruthy();
+        expect(post.mock.calls[1][0].headers?.Cookie).toContain(`deviceId=${firstDevice}`);
         expect(post.mock.calls[1][0].headers?.Cookie).toContain('NMTID=session-nonce');
     });
     it('does not preserve a second authenticated account after sign-out', async () => {
@@ -54,6 +74,15 @@ describe('iOS direct NetEase transport', () => {
         post.mockResolvedValueOnce({status:200, headers:{}, url:'', data:{code:200, songs:[{id:2}]}});
         expect(await requestIOSNetease('/playlist/track/all?id=12&offset=1&limit=1')).toMatchObject({songs:[{id:2}]});
         expect(new URLSearchParams(post.mock.calls[1][0].data as string).get('c')).toBe('[{"id":2}]');
+    });
+    it('preserves a refused QR request code and message for diagnostics', async () => {
+        post.mockResolvedValue({status:403, headers:{}, data:{code:8821, message:'request denied'}, url:''});
+        try {
+            await requestIOSNetease('/login/qr/check?key=fixture');
+            throw new Error('Expected request to fail');
+        } catch (error) {
+            expect(describeNeteaseLoginFailure('check', error)).toMatchObject({httpStatus:403, code:'8821', message:'request denied'});
+        }
     });
     it('rejects a non-JSON HTTP failure and unsupported routes explicitly', async () => {
         post.mockResolvedValue({status:502, headers:{}, data:{code:502}, url:''});

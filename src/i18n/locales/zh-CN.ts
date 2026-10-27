@@ -1460,6 +1460,8 @@ export default {
     "songs": "首",
     "loginTitle": "使用网易云APP扫码",
     "loginNote": "打开网易云音乐APP > 发现 > 扫一扫",
+    "loginTitleWeb": "登录网易云音乐",
+    "loginNoteWeb": "在应用内使用手机号和短信验证码登录",
     "loginTitleKugou": "使用酷狗音乐APP扫码",
     "loginNoteKugou": "打开酷狗音乐APP扫描二维码",
     "loginTitleQq": "扫码登录QQ音乐",

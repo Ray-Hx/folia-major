@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F011B0000000000000000004 /* NeteaseWebLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F011A0000000000000000004; };
 		F011B0000000000000000003 /* FoliaViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F011A0000000000000000003; };
 		F011B0000000000000000002 /* FoliaNativePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F011A0000000000000000002; };
 		F011B0000000000000000001 /* NativeLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = F011A0000000000000000001; };
@@ -25,6 +26,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		F011A0000000000000000004 /* NeteaseWebLogin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeteaseWebLogin.swift; sourceTree = "<group>"; };
 		F011A0000000000000000003 /* FoliaViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoliaViewController.swift; sourceTree = "<group>"; };
 		F011A0000000000000000002 /* FoliaNativePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoliaNativePlugin.swift; sourceTree = "<group>"; };
 		F011A0000000000000000001 /* NativeLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeLibrary.swift; sourceTree = "<group>"; };
@@ -89,6 +91,7 @@
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				F011A0000000000000000003 /* FoliaViewController.swift */,
+				F011A0000000000000000004 /* NeteaseWebLogin.swift */,
 				F011A0000000000000000002 /* FoliaNativePlugin.swift */,
 				F011A0000000000000000001 /* NativeLibrary.swift */,
 				F011A0000000000000000000 /* NativeAudioEngine.swift */,
@@ -211,6 +214,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F011B0000000000000000003 /* FoliaViewController.swift in Sources */,
+				F011B0000000000000000004 /* NeteaseWebLogin.swift in Sources */,
 				F011B0000000000000000002 /* FoliaNativePlugin.swift in Sources */,
 				F011B0000000000000000001 /* NativeLibrary.swift in Sources */,
 				F011B0000000000000000000 /* NativeAudioEngine.swift in Sources */,
@@ -365,7 +369,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -387,7 +391,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (

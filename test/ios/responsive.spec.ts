@@ -124,6 +124,7 @@ test('all built-in lyric renderers mount in portrait and landscape', async ({ pa
 });
 
 test('iPhone panel dock and body remain separate in both orientations', async ({ page }) => {
+    test.setTimeout(180000);
     await page.addInitScript(({ version, key }) => {
         localStorage.setItem(key, version); localStorage.setItem('folia_last_seen_guide_version', version);
         localStorage.setItem('library_suite_prompt_seen', 'true'); localStorage.setItem('library_suite', 'grid');
@@ -137,6 +138,11 @@ test('iPhone panel dock and body remain separate in both orientations', async ({
     });
     for (const viewport of [{width:402,height:874}, {width:874,height:402}]) {
         await page.setViewportSize(viewport); await page.waitForTimeout(500);
+        await page.evaluate(async light => {
+            const path = '/src/stores/useThemeSettingsStore.ts';
+            const { useThemeSettingsStore } = await import(/* @vite-ignore */ path);
+            useThemeSettingsStore.getState().setDaylightPreference(light);
+        }, viewport.width === 402);
         const surface = page.getByTestId('unified-panel-surface');
         await expect(surface).toBeVisible(); await assertInside(page, '[data-testid="unified-panel-surface"]');
         const boxes = await surface.locator('[data-ponder-panel-tab-button]').evaluateAll(nodes => nodes.map(node => {
@@ -151,6 +157,37 @@ test('iPhone panel dock and body remain separate in both orientations', async ({
         const scroll = await surface.locator('.st-scroll').boundingBox();
         expect(scroll!.y + scroll!.height).toBeLessThanOrEqual(dock!.y + 1);
         await page.screenshot({path:`test-results/ios/control-panel-${viewport.width}.png`});
+        for (const pickerName of ['Lyrics Style', 'Background Type']) {
+            const pickerButton = surface.getByRole('button', { name: pickerName, exact: true });
+            await pickerButton.click();
+            const picker = page.locator('.ios-effect-picker:not([data-leaving])');
+            await expect(picker).toBeVisible();
+            const grid = picker.getByRole('radiogroup');
+            await expect(grid).toBeVisible();
+            const cards = await grid.getByRole('radio').evaluateAll(nodes => nodes.map(node => {
+                const tile = node.getBoundingClientRect();
+                const image = node.firstElementChild!.getBoundingClientRect();
+                const label = node.lastElementChild!.getBoundingClientRect();
+                return { top: tile.top, bottom: tile.bottom, height: tile.height, imageBottom: image.bottom, labelTop: label.top, labelBottom: label.bottom };
+            }));
+            await assertInside(page, '.ios-effect-picker:not([data-leaving])');
+            const visibleGrid = await grid.boundingBox();
+            expect(visibleGrid!.height).toBeGreaterThan(cards[0].height + 8);
+            expect(cards.length).toBeGreaterThan(5);
+            for (let i = 0; i < cards.length; i++) {
+                expect(cards[i].labelTop).toBeGreaterThanOrEqual(cards[i].imageBottom - 1);
+                expect(cards[i].labelBottom).toBeLessThanOrEqual(cards[i].bottom + 1);
+                if (i >= 3) expect(cards[i].top).toBeGreaterThanOrEqual(cards[i - 3].bottom + 4);
+            }
+            await page.screenshot({path:`test-results/ios/${pickerName === 'Lyrics Style' ? 'style' : 'background'}-picker-${viewport.width}.png`});
+            await grid.evaluate(node => { node.scrollTop = node.scrollHeight; });
+            await expect(grid.getByRole('radio').last()).toBeInViewport({ ratio: 1 });
+            await grid.getByRole('radio').last().click();
+            await expect(grid.getByRole('radio').last()).toHaveAttribute('aria-checked', 'true');
+            await picker.getByRole('button', { name: 'Close', exact: true }).click();
+            await expect(picker).toBeHidden();
+        }
+
     }
 });
 

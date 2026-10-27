@@ -1,5 +1,6 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { settingsTokens, useSettingsKitTheme } from './kitTheme';
 import { POPOVER_GUTTER, placePopover, type PopoverAlign, type PopoverPlace, type PopoverSide } from './popoverPlace';
 
 // src/components/modal/settings/kit/Popover.tsx
@@ -34,6 +35,8 @@ type PopoverProps = {
     align?: PopoverAlign;
     /** As wide as the window, less a gutter at both sides. */
     fill?: boolean;
+    /** A mobile picker uses the full safe viewport rather than a short, scrolling panel. */
+    viewportSheet?: boolean;
     /** What takes focus on opening; without it, the first part that Tab would reach. */
     focusRef?: React.RefObject<HTMLElement | null>;
     id?: string;
@@ -45,8 +48,9 @@ type PopoverProps = {
 };
 
 export const Popover: React.FC<PopoverProps> = ({
-    anchorRef, open, onClose, side = 'under', align = 'start', fill = false, focusRef, className = '', children, ...naming
+    anchorRef, open, onClose, side = 'under', align = 'start', fill = false, viewportSheet = false, focusRef, className = '', children, ...naming
 }) => {
+    const { isDaylight, theme } = useSettingsKitTheme();
     const layerRef = useRef<HTMLDivElement>(null);
     const onCloseRef = useRef(onClose);
     onCloseRef.current = onClose;
@@ -60,8 +64,8 @@ export const Popover: React.FC<PopoverProps> = ({
     }
 
     useLayoutEffect(() => {
-        setHost(anchorRef.current?.closest<HTMLElement>('.st-window') ?? null);
-    }, [anchorRef, open]);
+        setHost(anchorRef.current?.closest<HTMLElement>(viewportSheet ? '.folia-app-shell' : '.st-window') ?? null);
+    }, [anchorRef, open, viewportSheet]);
 
     // Opening: the layer is in the window by now and has its own size. Before the paint it is
     // placed, takes focus, and starts to listen for what closes it.
@@ -72,7 +76,7 @@ export const Popover: React.FC<PopoverProps> = ({
             return undefined;
         }
         const frame = host.getBoundingClientRect();
-        setPlace(placePopover(
+        if (!viewportSheet) setPlace(placePopover(
             anchor.getBoundingClientRect(),
             { width: layer.offsetWidth, height: layer.scrollHeight },
             {
@@ -117,7 +121,7 @@ export const Popover: React.FC<PopoverProps> = ({
             // Focus that is still in the layer goes back to the anchor.
             if (layer.contains(document.activeElement)) anchor.focus({ preventScroll: true });
         };
-    }, [open, host, anchorRef, focusRef, side, align, fill]);
+    }, [open, host, anchorRef, focusRef, side, align, fill, viewportSheet]);
 
     if (!host || !present) {
         return null;
@@ -126,7 +130,18 @@ export const Popover: React.FC<PopoverProps> = ({
     const placed = place?.side ?? side;
     const origin = fill || align === 'center' ? 'center' : align === 'end' ? 'right' : 'left';
     // Until it is placed it only has to have its own size.
-    const edges = place
+    const edges: React.CSSProperties = viewportSheet
+        ? {
+            position: 'fixed',
+            left: 'max(16px, env(safe-area-inset-left))',
+            right: 'max(16px, env(safe-area-inset-right))',
+            bottom: 'calc(env(safe-area-inset-bottom) + 16px)',
+            maxHeight: 'calc(var(--ios-visible-height, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 32px)',
+            maxWidth: 480,
+            marginInline: 'auto',
+            zIndex: 110,
+        }
+        : place
         ? { left: place.left, right: place.right, top: place.top, bottom: place.bottom, maxHeight: place.maxHeight }
         : fill ? { left: POPOVER_GUTTER, right: POPOVER_GUTTER, top: 0 } : { left: 0, top: 0 };
 
@@ -154,6 +169,7 @@ export const Popover: React.FC<PopoverProps> = ({
                 }
             }}
             style={{
+                ...(viewportSheet ? settingsTokens(isDaylight, theme) : {}),
                 ...edges,
                 // It grows out of the corner at its anchor.
                 transformOrigin: `${origin} ${placed === 'over' ? 'bottom' : 'top'}`,
@@ -161,7 +177,7 @@ export const Popover: React.FC<PopoverProps> = ({
                 // It holds focus without a mark of its own.
                 outline: 'none',
             }}
-            className={`st-pop st-scroll absolute z-30 flex flex-col overflow-y-auto overscroll-contain rounded-[10px] bg-[var(--st-menu)] text-[color:var(--st-t1)] shadow-[0_14px_36px_rgba(0,0,0,0.34),0_0_0_1px_var(--st-line2)] ${fill ? '' : 'w-max max-w-[calc(100%-16px)] '}${className}`}
+            className={`st-pop st-scroll ${viewportSheet ? 'ios-effect-picker' : ''} absolute z-30 flex flex-col overflow-y-auto overscroll-contain rounded-[10px] bg-[var(--st-menu)] text-[color:var(--st-t1)] shadow-[0_14px_36px_rgba(0,0,0,0.34),0_0_0_1px_var(--st-line2)] ${fill ? '' : 'w-max max-w-[calc(100%-16px)] '}${className}`}
         >
             {children}
         </div>,

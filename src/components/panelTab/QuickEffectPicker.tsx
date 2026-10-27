@@ -1,5 +1,7 @@
+import { isNativeIOS } from '../../services/ios/native';
 import React from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { PictureGrid, Popover, type PictureState } from '../modal/settings/kit';
 
 // src/components/panelTab/QuickEffectPicker.tsx
@@ -41,11 +43,23 @@ export const PickerMoreButton: React.FC<{ label: string; onClose: () => void; on
 
 const QuickEffectPicker = <Value extends string>({
     anchorRef, open, onClose, value, options, picture, onChange, label, moreLabel, onOpenMore,
-}: QuickEffectPickerProps<Value>) => (
-    <Popover anchorRef={anchorRef} open={open} onClose={onClose} fill aria-label={label} className="flex flex-col rounded-[14px] pb-1 pt-2">
+}: QuickEffectPickerProps<Value>) => {
+    const { t } = useTranslation();
+    const native = isNativeIOS();
+    return (
+    <Popover viewportSheet={native} anchorRef={anchorRef} open={open} onClose={onClose} fill aria-label={label} className="flex flex-col rounded-[14px] pb-1 pt-2">
+        {native && (
+            <div className="flex h-11 shrink-0 items-center justify-between gap-3 px-3">
+                <span className="min-w-0 truncate text-sm font-semibold">{label}</span>
+                <button type="button" aria-label={t('ui.close')} onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full">
+                    <X size={18} />
+                </button>
+            </div>
+        )}
         <PictureGrid value={value} options={options} picture={picture} columns={3} onChange={onChange} label={label} maxHeight={300} />
         <PickerMoreButton label={moreLabel} onClose={onClose} onOpenMore={onOpenMore} />
     </Popover>
-);
+    );
+};
 
 export default QuickEffectPicker;

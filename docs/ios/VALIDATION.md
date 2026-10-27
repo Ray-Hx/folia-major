@@ -72,3 +72,15 @@ Build 4 release archive/export and strict/deep signature verification passed. Th
 - Build 5 archive/export passed strict/deep signature verification. Delivery IPA: 11,579,924 bytes; SHA-256 `460d5aa90a1d86192957e8ecc90efe356d951b924073fa29f4e8c077529600c1`. Development profile expiry and account-login limitations above remain applicable. The exact exported build 5 app was installed and launched on the connected iPhone 16 Pro.
 
 Final lyric sweep passed for all 15 styles in both orientations, including settled full-screen geometry and actual classic lyric text. Together with the nine other passing cases, all ten iOS WebKit scenarios passed across the full run and focused reruns. The sweep waits for deferred loading and the incoming style animation to settle before measuring its frame; the app renderer was not changed.
+
+## Build 6: overlapping quick-picker preview cards
+
+The reported screenshot was reproduced on the unchanged build 5 source: a preview label extended beyond its tile. `PictureGrid` is a height-constrained grid inside a shrinking flex layout; automatic rows compressed while the aspect-ratio previews overflowed. Rows now use max-content sizing and preview frames do not shrink, so the grid scrolls complete cards.
+
+On native iOS, lyric/background quick pickers additionally use a viewport sheet rather than being restricted to the scrolling control panel. This avoids the landscape case where the anchored popover could only expose a thin strip of a card. The sheet respects all four safe-area insets, has a close button and preserves the existing selection, previews and More Settings action. Desktop popovers retain their original placement.
+
+TypeScript and production resource build/sync passed. The existing WebKit panel case was extended and passed at 402 × 874 (light) and 874 × 402 (dark), covering both lyric and background choices: image/label containment, separated rows, viewport bounds, enough height for a complete card, full visibility and selection of the final item after scrolling, and touch dismissal. [Portrait layout evidence](screenshots/iphone16pro-style-picker-fixed.png). The fixture has no music source and captures preview glyph placeholders; the preview renderer itself is unchanged.
+
+Build 6 signed archive/export and strict/deep signature verification passed. IPA: 11,580,237 bytes; SHA-256 `17d645fdcffe9ed872da7a1ea53f799d9d35bd89d998098727898bdf081836ee`. Provisioning constraints remain unchanged.
+
+The exact exported build 6 app was installed and launched on the connected iPhone 16 Pro. Visual/layout assertions above were performed in WebKit, not claimed as an automated inspection of the physical screen.

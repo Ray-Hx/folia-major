@@ -74,7 +74,7 @@ const Tile = memo(<T extends string>({ value, label, picture, tabStop, markId, r
         tabIndex={tabStop ? 0 : -1}
         className="group flex min-w-0 flex-col rounded-lg text-xs leading-[18px]"
     >
-        <span className="relative block aspect-[16/10] w-full">
+        <span className="relative block aspect-[16/10] w-full shrink-0">
             <span aria-hidden className="st-t-fast absolute inset-0 overflow-hidden rounded-lg bg-[var(--st-pv)] transition-transform group-active:scale-[0.97]">
                 {picture(value, state)}
                 <span className="pointer-events-none absolute inset-0 rounded-lg shadow-[inset_0_0_0_1px_var(--st-line)]" />
@@ -209,6 +209,8 @@ export const PictureGrid = <T extends string>({ value, options, picture, columns
             }}
             style={{
                 gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+                // A capped, shrinking flex child must scroll its rows, not squeeze picture tiles.
+                gridAutoRows: 'max-content',
                 maxHeight,
                 ...(more ? { maskImage: FADE_MASK, WebkitMaskImage: FADE_MASK } : {}),
             }}

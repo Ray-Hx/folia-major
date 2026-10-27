@@ -362,6 +362,33 @@ final class NativePlaybackTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: url), Data([1, 2, 3, 4, 5]))
         XCTAssertThrowsError(try NativeLibrary.writeChunk(path: "../outside.audio", data: "AA==", append: false))
     }
+    func testLiveQqLoginStarts() async throws {
+        guard ProcessInfo.processInfo.environment["FOLIA_LIVE_QQ"] == "1" else { throw XCTSkip("Live QQ login probe is opt-in") }
+        func findWebView(_ view: UIView) -> WKWebView? {
+            if let web = view as? WKWebView { return web }
+            return view.subviews.lazy.compactMap { findWebView($0) }.first
+        }
+        let window = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap { $0.windows }.first!
+        let web = findWebView(window)!
+        for _ in 0..<100 {
+            if (try? await web.evaluateJavaScript("typeof window.Capacitor?.nativePromise === 'function'")) as? Bool == true { break }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        let assets = Bundle.main.url(forResource: "public", withExtension: nil)!.appendingPathComponent("assets")
+        let module = try XCTUnwrap(FileManager.default.contentsOfDirectory(at: assets, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.hasPrefix("iosQq-") && $0.pathExtension == "js" })
+        let result = try await web.callAsyncJavaScript("""
+            const api = await import('/assets/' + moduleName);
+            const channels = await (await api.requestIOSQq('/login/channels', {})).json();
+            const key = await (await api.requestIOSQq('/login/qr/key?channel=' + channel, {})).json();
+            if (!key.data?.unikey) return { channels: channels.data?.channels, code: key.code, message: key.message };
+            const image = await (await api.requestIOSQq('/login/qr/create?key=' + encodeURIComponent(key.data.unikey), {})).json();
+            const check = await (await api.requestIOSQq('/login/qr/check?key=' + encodeURIComponent(key.data.unikey), {})).json();
+            return { channels: channels.data?.channels, image: Boolean(image.data?.qrimg), code: image.code, check: check.code, message: image.message };
+            """, arguments: ["moduleName": module.lastPathComponent, "channel": ProcessInfo.processInfo.environment["FOLIA_QQ_CHANNEL"] ?? "qq"], in: nil, contentWorld: .page) as! [String: Any]
+        XCTAssertEqual(result["image"] as? Bool, true, "QQ QR probe failed: \(result)")
+        XCTAssertEqual(result["check"] as? Int, 801, "QQ QR polling failed: \(result)")
+    }
     func testWebKitBridgeReadsSandboxFileAndParsesMetadata() async throws {
         let source = try track(seconds: 2)
         let path = URL(string: source)!.lastPathComponent

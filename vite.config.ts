@@ -266,6 +266,15 @@ export default async function viteConfig(_config: ConfigEnv): Promise<UserConfig
       },
     },
     plugins: [
+      {
+        name: 'ios-qq-native-fetch',
+        transform(code, id) {
+          if (process.env.FOLIA_IOS !== 'true' || !id.includes('/@yakult-green-tea/qq-music-api/dist-esm/src/')) return;
+          if (!/\/(serverless\/(fetchAuthHttpClient|fetchLegacyTransport)|services\/auth\/ptlogin)\.js$/.test(id)) return;
+          const bridge = path.resolve('src/services/onlineMusic/qq/iosQqFetch.ts');
+          return `import { iosQqFetch } from ${JSON.stringify(bridge)};\n` + code.replaceAll('await fetch(', 'await iosQqFetch(').replace('globalThis.fetch(input, request)', 'iosQqFetch(input, request)');
+        },
+      },
       iosNeteaseRoutesPlugin(),
       devLyricProxyPlugin(),
       commandPinyinPlugin(),

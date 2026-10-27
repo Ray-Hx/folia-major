@@ -1,4 +1,5 @@
 import { OnlineProviderError } from '../../../types/onlineMusic';
+import { isNativeIOS } from '../../ios/native';
 import { readProviderSessionValue, removeProviderSessionValue, writeProviderSessionValue } from '../providerStorage';
 import { withLoginRequestLimit } from '../login/loginRequestLimit';
 import { withOnlineRequestLimit } from '../failure/onlineRequestLimit';
@@ -333,6 +334,7 @@ export const getQqRemoteApiBase = (): string | null => (getElectronQqPortReader(
 
 export const getQqTransportAvailability = () => {
     if (getElectronQqPortReader()) return { configured: true } as const;
+    if (isNativeIOS()) return { configured: true } as const;
     return getWebApiBase()
         ? { configured: true } as const
         : { configured: false, reason: 'not-configured' as const };
@@ -410,7 +412,8 @@ export const requestQq = async <T = unknown>(
         );
     }
     const stored = getWebSessionCookie();
-    const base = await resolveApiBase();
+    const native = isNativeIOS() && !getWebApiBase() && !getElectronQqPortReader();
+    const base = native ? '/ios-qq' : await resolveApiBase();
     // The session parked for this run is not sent (isQqSessionParked). The status is read once the backend has a port.
     const cookie = stored && await isQqSessionStoreUnreadable() ? '' : stored;
 
@@ -440,7 +443,10 @@ export const requestQq = async <T = unknown>(
         : { credentials, headers };
     // The answer and its body, read together: the time limit covers both.
     const send = async (signal?: AbortSignal) => {
-        const answer = await fetch(`${base}${endpoint.path}?${query}`, { ...init, ...(signal ? { signal } : {}) });
+        const request = { ...init, ...(signal ? { signal } : {}) };
+        const answer = native
+            ? await (await import('./iosQq')).requestIOSQq(`${endpoint.path}?${query}`, request)
+            : await fetch(`${base}${endpoint.path}?${query}`, request);
         return { response: answer, body: await readJsonBody(answer) };
     };
     const { response, body } = await (LOGIN_REQUESTS.has(operation) ? withLoginRequestLimit(send)

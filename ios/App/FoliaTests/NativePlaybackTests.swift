@@ -389,6 +389,20 @@ final class NativePlaybackTests: XCTestCase {
         XCTAssertEqual(result["image"] as? Bool, true, "QQ QR probe failed: \(result)")
         XCTAssertEqual(result["check"] as? Int, 801, "QQ QR polling failed: \(result)")
     }
+    func testWebKitQqCookieHeaders() async throws {
+        func findWebView(_ view: UIView) -> WKWebView? {
+            if let web = view as? WKWebView { return web }
+            return view.subviews.lazy.compactMap { findWebView($0) }.first
+        }
+        let window = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap { $0.windows }.first!
+        let web = findWebView(window)!
+        for _ in 0..<100 {
+            if (try? await web.evaluateJavaScript("typeof window.Capacitor?.nativePromise === 'function'")) as? Bool == true { break }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        let result = try await web.evaluateJavaScript("new Headers({cookie:'a=b'}).get('cookie')") as? String
+        XCTAssertEqual(result, "a=b")
+    }
     func testWebKitBridgeReadsSandboxFileAndParsesMetadata() async throws {
         let source = try track(seconds: 2)
         let path = URL(string: source)!.lastPathComponent

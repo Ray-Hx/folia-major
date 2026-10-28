@@ -39,6 +39,8 @@ const playbackState = vi.hoisted(() => ({
     replayGainMode: 'off',
 }));
 const setPlayerStateMock = vi.hoisted(() => vi.fn());
+const ios = vi.hoisted(() => ({ active: false }));
+vi.mock('../../../src/services/ios/native', () => ({ isNativeIOS: () => ios.active }));
 vi.mock('../../../src/stores/usePlaybackStore', () => ({
     usePlaybackStore: (selector: (state: typeof playbackState) => unknown) => selector(playbackState),
     setPlayerState: setPlayerStateMock,
@@ -83,8 +85,8 @@ const createDeck = (error: { code: number } | null) => ({
     load: vi.fn(),
 });
 
-const renderBridge = (deck: ReturnType<typeof createDeck>, shouldAutoPlayRef: { current: boolean }) => {
-    playbackState.audioSrc = FAILED_SRC;
+const renderBridge = (deck: ReturnType<typeof createDeck>, shouldAutoPlayRef: { current: boolean }, source = FAILED_SRC) => {
+    playbackState.audioSrc = source;
     reactHooks.startRender();
     usePlaybackAudioBridge({
         audioRef: { current: deck as unknown as HTMLAudioElement },
@@ -107,6 +109,7 @@ const renderBridge = (deck: ReturnType<typeof createDeck>, shouldAutoPlayRef: { 
 
 describe('autoplay intent while a failed source is being transcoded', () => {
     beforeEach(() => {
+        ios.active = false;
         reactHooks.refs.length = 0;
         setPlayerStateMock.mockClear();
         // node 环境下没有可写的 localStorage，被测 hook 会往里写 replaygain 模式。
@@ -133,5 +136,20 @@ describe('autoplay intent while a failed source is being transcoded', () => {
 
         expect(deck.play).toHaveBeenCalledTimes(1);
         expect(shouldAutoPlayRef.current).toBe(false);
+    });
+});
+
+describe('native source changes', () => {
+    it('does not pause or reload the new native track during source replacement', () => {
+        ios.active = true;
+        reactHooks.refs.length = 0;
+        const deck = createDeck(null);
+        vi.stubGlobal('localStorage', { setItem: vi.fn() });
+        renderBridge(deck, { current: false }, 'first');
+        renderBridge(deck, { current: false }, 'second');
+        expect(deck.pause).not.toHaveBeenCalled();
+        expect(deck.load).not.toHaveBeenCalled();
+        vi.unstubAllGlobals();
+        ios.active = false;
     });
 });

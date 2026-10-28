@@ -272,7 +272,7 @@ export function usePlaybackAudioBridge({
             return;
         }
 
-        if (audioSrc && previousAudioSrcRef.current && previousAudioSrcRef.current !== audioSrc) {
+        if (!isNativeIOS() && audioSrc && previousAudioSrcRef.current && previousAudioSrcRef.current !== audioSrc) {
             audioElement.pause();
             audioElement.load();
         }

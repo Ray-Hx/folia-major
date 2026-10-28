@@ -33,11 +33,16 @@ export function useIOSChrome(next: () => void, previous: () => void, openPlayer:
             document.documentElement.dataset.iosTransportShown = String(shown);
             void FoliaNative.setChrome(payload).catch(error => console.error('[iOSChrome] Presentation failed', error));
         };
-        const observer = new MutationObserver(sync);
+        let scheduled: number | undefined;
+        const schedule = () => {
+            if (scheduled !== undefined) return;
+            scheduled = window.setTimeout(() => { scheduled = undefined; sync(); }, 50);
+        };
+        const observer = new MutationObserver(schedule);
         observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-folia-keyboard-window'] });
         document.addEventListener('visibilitychange', sync);
         sync();
-        return () => { observer.disconnect(); document.removeEventListener('visibilitychange', sync); };
+        return () => { observer.disconnect(); if (scheduled !== undefined) window.clearTimeout(scheduled); document.removeEventListener('visibilitychange', sync); };
     }, [source, view, panelOpen, hidden, hideBar, light, t]);
     useEffect(() => {
         if (!isNativeIOS()) return;

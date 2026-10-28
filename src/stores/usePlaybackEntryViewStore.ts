@@ -7,6 +7,7 @@
 
 import { create } from 'zustand';
 import { getStoredBoolean, getStoredString, setStoredBoolean } from './storagePrimitives';
+import { isNativeIOS } from '../services/ios/native';
 
 /**
  * Where pressing play lands. `player` is the visualizer page, `lattice` the queue collage, and
@@ -45,7 +46,7 @@ const LIBRARY_SUITE_PROMPT_SEEN_KEY = 'library_suite_prompt_seen';
 export type StartupPromptPage = 'library-suite' | 'playback-entry-view';
 
 const readEntryView = (): PlaybackEntryView => {
-    const stored = getStoredString(ENTRY_VIEW_KEY, 'player');
+    const stored = getStoredString(ENTRY_VIEW_KEY, isNativeIOS() ? 'stay' : 'player');
     return isPlaybackEntryView(stored) ? stored : 'player';
 };
 

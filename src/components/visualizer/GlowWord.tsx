@@ -77,6 +77,7 @@ export const GlowWord = <TConfig extends { id: string }>({
             animate={status}
             // Add `whitespace-nowrap` to prevent unexpected line breaks
             className="inline-block origin-center relative will-change-transform whitespace-nowrap"
+            data-ios-hdr-active={hdrHighlight && status === 'active' ? '' : undefined}
             style={{
                 fontSize,
                 fontWeight: resolveThemeFontWeight(theme, 700),
@@ -128,17 +129,6 @@ export const GlowWord = <TConfig extends { id: string }>({
             >
                 {word.text}
             </motion.span>
-            {hdrHighlight && status === 'active' && (
-                <motion.span
-                    aria-hidden="true"
-                    variants={bodyVariants}
-                    custom={{ config, activeColor, baseColor, duration, wordRevealMode: renderProfile.wordRevealMode }}
-                    className="ios-hdr-lyric-highlight absolute inset-0 z-10 pointer-events-none select-none"
-                >
-                    {word.text}
-                </motion.span>
-            )}
-
             {/* Chorus Ripple Effect */}
             <AnimatePresence>
                 {isChorus && status === 'active' && (

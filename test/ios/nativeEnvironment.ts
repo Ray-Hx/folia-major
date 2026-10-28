@@ -5,7 +5,7 @@ export async function installNativeEnvironment(page: Page) {
     await page.addInitScript(() => {
         const host = window as any;
         host.CapacitorCustomPlatform = { name: 'ios' };
-        const methods = ['load', 'play', 'pause', 'seek', 'setVolume', 'setQueue', 'getState', 'setChrome', 'setLyricHDR', 'lyricHDRCapabilities', 'writeAudioChunk', 'getDocument', 'importDocuments', 'neteaseWebLogin', 'removeListener'];
+        const methods = ['load', 'play', 'pause', 'seek', 'setVolume', 'setQueue', 'getState', 'setChrome', 'writeAudioChunk', 'getDocument', 'importDocuments', 'neteaseWebLogin', 'removeListener'];
         const state = { url: '', position: 0, duration: 0, playing: false, event: 'state' };
         host.Capacitor = {
             PluginHeaders: [
@@ -16,7 +16,6 @@ export async function installNativeEnvironment(page: Page) {
             nativePromise: async (plugin: string, method: string) => {
                 if (plugin === 'CapacitorHttp') return { status: 200, data: { code: 301 }, headers: {} };
                 if (method === 'getState' || method === 'load') return state;
-                if (method === 'lyricHDRCapabilities') return { supported: false };
                 if (method === 'neteaseWebLogin') return { cancelled: true };
                 return {};
             },

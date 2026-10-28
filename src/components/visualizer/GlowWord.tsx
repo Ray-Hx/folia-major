@@ -24,8 +24,6 @@ export interface GlowWordProps<TConfig extends { id: string }> {
     fontSize: string;
     /** Mode-specific spacing merged into the word's own style (e.g. marginRight, alignSelf). */
     layoutStyle: React.CSSProperties;
-    /** Optional iPhone HDR experiment, enabled by the owning visualizer. */
-    hdrHighlight?: boolean;
 }
 
 export const GlowWord = <TConfig extends { id: string }>({
@@ -41,7 +39,6 @@ export const GlowWord = <TConfig extends { id: string }>({
     isChorus,
     fontSize,
     layoutStyle,
-    hdrHighlight = false,
 }: GlowWordProps<TConfig>) => {
     const [status, setStatus] = useState<'waiting' | 'active' | 'passed'>('waiting');
     const rippleScale = useMemo(() => 1.5 + Math.random() * 2, []);
@@ -77,7 +74,6 @@ export const GlowWord = <TConfig extends { id: string }>({
             animate={status}
             // Add `whitespace-nowrap` to prevent unexpected line breaks
             className="inline-block origin-center relative will-change-transform whitespace-nowrap"
-            data-ios-hdr-active={hdrHighlight && status === 'active' ? '' : undefined}
             style={{
                 fontSize,
                 fontWeight: resolveThemeFontWeight(theme, 700),

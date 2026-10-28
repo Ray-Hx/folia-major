@@ -7,11 +7,9 @@ import { useThemeSettingsStore } from '../../stores/useThemeSettingsStore';
 import { usePlayerChromeSettingsStore } from '../../stores/usePlayerChromeSettingsStore';
 import { FoliaNative, isNativeIOS } from '../../services/ios/native';
 import { hasBlockingWindow } from '../../utils/keyboardTargets';
-import { useIOSLyricHDR } from './useIOSLyricHDR';
 
 // Keep native transport visibility in step with Folia windows; track progress stays entirely native.
 export function useIOSChrome(next: () => void, previous: () => void, openPlayer: () => void) {
-    useIOSLyricHDR();
     const { t } = useTranslation();
     const callbacks = useRef({ next, previous, openPlayer });
     callbacks.current = { next, previous, openPlayer };

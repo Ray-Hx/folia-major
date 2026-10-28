@@ -7,12 +7,11 @@ public class FoliaNativePlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "FoliaNativePlugin"
     public let jsName = "FoliaNative"
     public let pluginMethods: [CAPPluginMethod] = [
-        "setChrome", "setLyricHDR", "lyricHDRCapabilities", "writeAudioChunk", "load", "play", "pause", "seek", "setVolume", "setQueue", "getState", "importDocuments", "getDocument", "neteaseWebLogin"
+        "setChrome", "writeAudioChunk", "load", "play", "pause", "seek", "setVolume", "setQueue", "getState", "importDocuments", "getDocument", "neteaseWebLogin"
     ].map { CAPPluginMethod(name: $0, returnType: CAPPluginReturnPromise) }
     private let engine = NativeAudioEngine()
     private let library = NativeLibrary()
     private var chrome: NativePlayerChrome?
-    private var lyricHDR: LyricHDRView?
 
     public override func load() {
         NativeLibrary.pruneAudioCache()
@@ -41,31 +40,6 @@ public class FoliaNativePlugin: CAPPlugin, CAPBridgedPlugin {
             self.chrome?.present(["shown": call.getBool("shown") ?? false, "light": call.getBool("light") ?? false, "labels": call.getObject("labels") ?? [:]])
             self.chrome?.update(self.engine.snapshot())
             call.resolve()
-        }
-    }
-    @objc func setLyricHDR(_ call: CAPPluginCall) {
-        let regions = call.getArray("regions", [String: Double].self) ?? []
-        DispatchQueue.main.async { [weak self] in
-            guard let self, let controller = self.bridge?.viewController else { call.reject("No native host"); return }
-            guard #available(iOS 26.0, *) else { call.resolve(); return }
-            if self.lyricHDR == nil && !regions.isEmpty {
-                let host = controller.parent?.view ?? controller.view!
-                let effect = LyricHDRView(frame: host.bounds)
-                effect.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-                if controller.view.superview === host { host.insertSubview(effect, aboveSubview: controller.view) }
-                else { host.addSubview(effect) }
-                self.lyricHDR = effect
-            }
-            self.lyricHDR?.update(regions: regions)
-            call.resolve()
-        }
-    }
-    @objc func lyricHDRCapabilities(_ call: CAPPluginCall) {
-        DispatchQueue.main.async { [weak self] in
-            guard #available(iOS 26.0, *), let screen = self?.bridge?.viewController?.view.window?.windowScene?.screen else {
-                call.resolve(["supported": false]); return
-            }
-            call.resolve(["supported": screen.potentialEDRHeadroom > 1.05])
         }
     }
     private func onMain(_ call: CAPPluginCall, _ action: @escaping () throws -> Void) {

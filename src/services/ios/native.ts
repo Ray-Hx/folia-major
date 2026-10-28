@@ -25,8 +25,6 @@ export interface ImportedDocument {
     uri: string;
 }
 interface FoliaNativePlugin {
-    setLyricHDR(options: { regions: Array<{ x: number; y: number; width: number; height: number }> }): Promise<void>;
-    lyricHDRCapabilities(): Promise<{ supported: boolean }>;
     setChrome(options: { shown: boolean; light: boolean; labels: Record<string, string> }): Promise<void>;
     addListener(name: 'chromeAction', callback: (state: { action: string }) => void): Promise<PluginListenerHandle>;
     load(options: { url: string; nativeURL?: string }): Promise<NativeAudioState>;

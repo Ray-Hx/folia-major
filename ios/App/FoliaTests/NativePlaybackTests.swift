@@ -290,22 +290,6 @@ final class NativePlaybackTests: XCTestCase {
         XCTAssertTrue(chrome.isHidden)
     }
 
-    func testNativeLyricHDRLayerUsesExtendedColorsAndStopsAtSDR() throws {
-        guard #available(iOS 26.0, *) else { throw XCTSkip("Native lyric HDR needs iOS 26") }
-        let view = LyricHDRView(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
-        XCTAssertFalse(view.isUserInteractionEnabled)
-        let region: [String: Double] = ["x": 80, "y": 200, "width": 120, "height": 40]
-        view.update(regions: [region], availableHeadroom: 2)
-        guard !ProcessInfo.processInfo.isLowPowerModeEnabled else { throw XCTSkip("Low Power Mode suppresses HDR") }
-        let glow = try XCTUnwrap(view.layer.sublayers?.first as? CAGradientLayer)
-        XCTAssertEqual(glow.preferredDynamicRange, .high)
-        let colors = try XCTUnwrap(glow.colors as? [CGColor])
-        XCTAssertGreaterThan(UIColor(cgColor: try XCTUnwrap(colors.first)).linearExposure, 1)
-        XCTAssertFalse(glow.isHidden)
-        view.update(regions: [region], availableHeadroom: 1)
-        XCTAssertTrue(view.isHidden)
-    }
-
     func testPausedItemPublishesReadyDuration() async throws {
         let url = try track(seconds: 6)
         var publishedDuration = 0.0

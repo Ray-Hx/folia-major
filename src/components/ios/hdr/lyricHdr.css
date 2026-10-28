@@ -1,0 +1,16 @@
+/* Experimental HDR image clipped to the active classic lyric; other surfaces keep their SDR styling. */
+.ios-hdr-lyric-highlight { display: none; }
+@media (dynamic-range: high) {
+    @supports (-webkit-background-clip: text) {
+        html[data-native-ios] .ios-hdr-lyric-highlight {
+            display: block;
+            background-image: url('./lyricHighlight.png');
+            background-size: 100% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            dynamic-range-limit: no-limit;
+            opacity: 0.28;
+        }
+    }
+}

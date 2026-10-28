@@ -148,6 +148,46 @@ test('all built-in lyric renderers mount in portrait and landscape', async ({ pa
     expect(errors).toEqual([]);
 });
 
+test('classic HDR highlight follows its lyric without changing layout', async ({ page }) => {
+    await page.setViewportSize({ width: 402, height: 874 });
+    await page.addInitScript(({ version, key }) => {
+        localStorage.setItem(key, version);
+        localStorage.setItem('folia_last_seen_guide_version', version);
+        localStorage.setItem('library_suite_prompt_seen', 'true');
+        localStorage.setItem('library_suite', 'grid');
+    }, { version: APP_VERSION, key: GUIDE_VERSION_STORAGE_KEY });
+    await page.goto('/');
+    await page.locator('#app-splash').waitFor({ state: 'detached', timeout: 120000 });
+    await page.evaluate(async () => {
+        const load = (path: string) => import(/* @vite-ignore */ path);
+        const [{ useAppViewStore }, { usePlaybackStore }, { useVisualizerSettingsStore }, parser, signals] = await Promise.all([
+            load('/src/stores/useAppViewStore.ts'), load('/src/stores/usePlaybackStore.ts'),
+            load('/src/stores/useVisualizerSettingsStore.ts'), load('/src/utils/lyrics/parserCore.ts'), load('/src/stores/motionSignals.ts'),
+        ]);
+        useVisualizerSettingsStore.getState().handleSetVisualizerMode('classic', { notify: false });
+        usePlaybackStore.setState({ lyrics: parser.parseLyricsByFormat('lrc', '[00:00.00]Hello Folia\n[00:10.00]Next line'), duration: 20, currentLineIndex: 0, playerState: 'PAUSED',
+            currentSong: { id: 'hdr-test', name: 'HDR', artists: [], album: { id: 0, name: '' }, durationMs: 20000, isLocal: true, localRef: { songId: 'hdr-test' }, sourceRef: { kind: 'local', mediaId: 'hdr-test' } } });
+        useAppViewStore.getState().setView('player');
+        signals.currentTime.set(0.5); signals.lyricCurrentTime.set(0.5);
+    });
+    await expect(page.locator('[data-visualizer-style="classic"]')).toBeVisible();
+    await page.evaluate(async () => {
+        const path = '/src/stores/motionSignals.ts';
+        const signals = await import(/* @vite-ignore */ path);
+        signals.currentTime.set(1); signals.lyricCurrentTime.set(1);
+    });
+    const highlight = page.locator('.ios-hdr-lyric-highlight').first();
+    await expect(highlight).toHaveCount(1);
+    // Browser automation is SDR; force the HDR-only layer visible to compare its geometry.
+    await page.addStyleTag({ content: '.ios-hdr-lyric-highlight { display: block !important; }' });
+    const geometry = await highlight.evaluate(node => {
+        const overlay = node.getBoundingClientRect();
+        const body = node.previousElementSibling!.getBoundingClientRect();
+        return [Math.abs(overlay.x - body.x), Math.abs(overlay.y - body.y), Math.abs(overlay.width - body.width), Math.abs(overlay.height - body.height)];
+    });
+    expect(geometry.every(value => value < 1)).toBe(true);
+});
+
 test('iPhone panel dock and body remain separate in both orientations', async ({ page }) => {
     test.setTimeout(180000);
     await page.addInitScript(({ version, key }) => {
